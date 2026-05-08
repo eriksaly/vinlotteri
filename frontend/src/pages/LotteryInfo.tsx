@@ -29,7 +29,7 @@ export default function LotteryInfoPage() {
       <div className="page-header">
         <div className="container">
           <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🍷</div>
-          <h1 className="page-title">Kontor-vinlotteri</h1>
+          <h1 className="page-title">Vinlotteri</h1>
           <p className="page-subtitle">Fem kroner kan forandre alt. Eller ingenting. Men det er verdt forsøket.</p>
         </div>
       </div>
@@ -45,7 +45,7 @@ export default function LotteryInfoPage() {
             <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div className="card">
                 <div className="card-header" style={{ background: 'var(--wine)', color: 'white' }}>
-                  🎯 Tre enkle steg til potensielt vin
+                  🎯 To enkle steg til potensielt vin
                 </div>
                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
@@ -58,16 +58,7 @@ export default function LotteryInfoPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{ fontSize: '2.2rem', flexShrink: 0 }}>2️⃣</div>
-                    <div>
-                      <strong>Skriv navn og antall lodd i melding</strong><br />
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        F.eks. <em>«Erik – 3 lodd»</em>. Uten navn havner pengene i kjelleren for alltid.
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{ fontSize: '2.2rem', flexShrink: 0 }}>3️⃣</div>
+                      <div style={{ fontSize: '2.2rem', flexShrink: 0 }}>2️⃣</div>
                     <div>
                       <strong>Vent spent på trekning!</strong><br />
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
@@ -84,7 +75,7 @@ export default function LotteryInfoPage() {
                     Vipps-nummer
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--wine)' }}>
-                    #{lottery.vippsNumber}
+                    {lottery.vippsNumber}
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.3rem' }}>
                     {lottery.pricePerTicket} kr per lodd
@@ -97,7 +88,7 @@ export default function LotteryInfoPage() {
               </div>
 
               <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                Odds øker med antall lodd. Det er ikke rakettforskning — men det er vinvitenskap. 🔬🍷
+                Odds øker med antall lodd. Det er ikke rakettforskning, men det er vinvitenskap. 🔬🍷
               </div>
             </div>
           ) : lottery && lottery.status === 'DRAWING' ? (
