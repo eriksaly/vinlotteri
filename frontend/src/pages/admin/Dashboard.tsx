@@ -324,14 +324,14 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
     setAnimating(true)
     setLatestWinner(null)
 
-    let resolveId!: (id: number) => void
-    let rejectId!: (e: unknown) => void
-    const winnerIdPromise = new Promise<number>((res, rej) => { resolveId = res; rejectId = rej })
-    const spinPromise = wheelRef.current?.spin(winnerIdPromise) ?? Promise.resolve()
+    let resolveWinner!: (v: { participantId: number; ticketNumber: number }) => void
+    let rejectWinner!: (e: unknown) => void
+    const winnerPromise = new Promise<{ participantId: number; ticketNumber: number }>((res, rej) => { resolveWinner = res; rejectWinner = rej })
+    const spinPromise = wheelRef.current?.spin(winnerPromise) ?? Promise.resolve()
 
     try {
       const result = await api.post<DrawResult>('/api/admin/lottery/draw')
-      resolveId(result.data.winner.participantId)
+      resolveWinner({ participantId: result.data.winner.participantId, ticketNumber: result.data.winner.ticketNumber })
       await spinPromise
       setLatestWinner(result.data.winner)
       setRemainingTickets(result.data.remainingTickets)
@@ -341,7 +341,7 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
       setAnimating(false)
       fireConfetti()
     } catch (e: unknown) {
-      rejectId(e)
+      rejectWinner(e)
       setAnimating(false)
       alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved trekning')
     }
@@ -393,31 +393,31 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
 
       {isDrawing && (
         <>
-          {/* Spinning wheel stage */}
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div style={{
-              background: 'linear-gradient(135deg, var(--wine-dark) 0%, var(--wine) 100%)',
-              padding: '2rem',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '1.2rem',
-            }}>
-              <SpinningWheel ref={wheelRef} buyers={buyers} />
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            {/* Spinning wheel stage */}
+            <div className="card" style={{ overflow: 'hidden', flex: '1 1 340px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, var(--wine-dark) 0%, var(--wine) 100%)',
+                padding: '2rem',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1.2rem',
+              }}>
+                <SpinningWheel ref={wheelRef} buyers={buyers} />
 
-              {latestWinner && !animating && (
-                <div style={{ color: 'white', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>🏆 {latestWinner.participantTag}</div>
-                  <div style={{ color: '#c5c5c5', fontSize: '0.7rem', marginTop: '0.2rem' }}>
-                    {latestWinner.participantName}
+                {latestWinner && !animating && (
+                  <div style={{ color: 'white', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>🏆 {latestWinner.participantTag}</div>
+                    <div style={{ color: '#c5c5c5', fontSize: '0.7rem', marginTop: '0.2rem' }}>
+                      {latestWinner.participantName}
+                    </div>
+                    <div style={{ color: '#e8c84a', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                      🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
+                    </div>
                   </div>
-                  <div style={{ color: '#e8c84a', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                    🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
-                  </div>
-                </div>
-              )}
+                )}
 
-              {isDrawing && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
                   <button
                     className="btn btn-gold btn-xl"
@@ -432,51 +432,47 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
                     </span>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Winners sidebar */}
+            <div className="card" style={{ flex: '0 0 200px', minWidth: 160 }}>
+              <div className="card-header" style={{ fontSize: '0.85rem', padding: '0.75rem 1rem' }}>
+                🏆 Vinnere ({winners.length}{lottery?.wineCount ? `/${lottery.wineCount}` : ''})
+              </div>
+              {winners.length === 0 ? (
+                <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  Ingen ennå
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {[...winners].reverse().map(w => (
+                    <div key={w.position} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.5rem 1rem', borderBottom: '1px solid var(--border)',
+                      gap: '0.5rem',
+                    }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', minWidth: 20 }}>#{w.position}</span>
+                      <span style={{ fontWeight: 700, flex: 1 }}>{w.participantTag}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>#{w.ticketNumber}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {lottery?.wineCount != null && winners.length >= lottery.wineCount && (
+                <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--border)' }}>
+                  <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={finishLottery}>🎉 Avslutt</button>
+                </div>
+              )}
+              {winners.length > 0 && (lottery?.wineCount == null || winners.length < lottery.wineCount) && (
+                <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--border)' }}>
+                  <button className="btn btn-outline btn-sm" style={{ width: '100%', color: 'var(--text-muted)', borderColor: 'var(--border)', fontSize: '0.75rem' }} onClick={finishLottery}>
+                    Avslutt tidlig
+                  </button>
+                </div>
               )}
             </div>
           </div>
-
-          {/* Winners list */}
-          {winners.length > 0 && (
-            <div className="card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🏆 Vinnere ({winners.length}{lottery?.wineCount ? `/${lottery.wineCount}` : ''})</span>
-                {isDrawing && lottery?.wineCount != null && winners.length >= lottery.wineCount && (
-                  <button className="btn btn-primary btn-sm" onClick={finishLottery}>🎉 Avslutt lotteri</button>
-                )}
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table">
-                  <thead>
-                    <tr><th>#</th><th>Vinner</th><th>Tag</th><th>Lodd-nr</th></tr>
-                  </thead>
-                  <tbody>
-                    {[...winners].reverse().map(w => (
-                      <tr key={w.position}>
-                        <td><span className="badge badge-gold">#{w.position}</span></td>
-                        <td style={{ fontWeight: 600 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <ParticipantAvatarById participantId={w.participantId} buyers={buyers} />
-                            {w.participantName}
-                          </div>
-                        </td>
-                        <td><span className="badge badge-wine">{w.participantTag}</span></td>
-                        <td style={{ color: 'var(--text-muted)' }}>{w.ticketNumber}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {isDrawing && winners.length > 0 && (lottery?.wineCount == null || winners.length < lottery.wineCount) && (
-            <div style={{ textAlign: 'right' }}>
-              <button className="btn btn-outline btn-sm" onClick={finishLottery} style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
-                Avslutt lotteri tidlig
-              </button>
-            </div>
-          )}
         </>
       )}
 
@@ -684,11 +680,13 @@ const WHEEL_COLORS = [
 function getWheelSegments(buyerList: Buyer[]) {
   const total = buyerList.reduce((s, b) => s + b.ticketCount, 0)
   if (total === 0) return []
+  const sorted = buyerList.slice().sort((a, b) => Math.min(...a.ticketNumbers) - Math.min(...b.ticketNumbers))
   let acc = 0
-  return buyerList.map((b, i) => {
+  return sorted.map((b, i) => {
     const sweep = (b.ticketCount / total) * 2 * Math.PI
     const start = acc; acc += sweep
-    return { buyer: b, start, end: acc, mid: start + sweep / 2, color: WHEEL_COLORS[i % WHEEL_COLORS.length] }
+    const ticketsSorted = b.ticketNumbers.slice().sort((a, b) => a - b)
+    return { buyer: b, start, end: acc, mid: start + sweep / 2, color: WHEEL_COLORS[i % WHEEL_COLORS.length], ticketsSorted }
   })
 }
 
@@ -734,7 +732,7 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
 }
 
 interface WheelHandle {
-  spin: (winnerIdPromise: Promise<number>) => Promise<void>
+  spin: (winnerPromise: Promise<{ participantId: number; ticketNumber: number }>) => Promise<void>
 }
 
 const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, ref) => {
@@ -748,7 +746,7 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
   }, [buyers])
 
   useImperativeHandle(ref, () => ({
-    spin(winnerIdPromise: Promise<number>): Promise<void> {
+    spin(winnerPromise: Promise<{ participantId: number; ticketNumber: number }>): Promise<void> {
       return new Promise(resolve => {
         if (spinningRef.current) { resolve(); return }
         spinningRef.current = true
@@ -788,10 +786,15 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
           rafRef.current = requestAnimationFrame(loop)
         }
         rafRef.current = requestAnimationFrame(loop)
-        winnerIdPromise.then(winnerId => {
-          const ws = getWheelSegments(snap).find(s => s.buyer.participant.id === winnerId)
+        winnerPromise.then(({ participantId, ticketNumber }) => {
+          const ws = getWheelSegments(snap).find(s => s.buyer.participant.id === participantId)
           if (!ws) return
-          const base = -Math.PI / 2 - ws.mid
+          const idx = ws.ticketsSorted.indexOf(ticketNumber)
+          const fraction = idx >= 0
+            ? (idx + 0.5) / ws.ticketsSorted.length
+            : 0.5
+          const targetAngle = ws.start + fraction * (ws.end - ws.start)
+          const base = -Math.PI / 2 - targetAngle
           const cur = angleRef.current
           const k = Math.ceil((cur + 8 * 2 * Math.PI - base) / (2 * Math.PI))
           decelFrom = cur; decelTarget = base + k * 2 * Math.PI
@@ -804,7 +807,7 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
     }
   }), [buyers])
 
-  return <canvas ref={canvasRef} width={340} height={340} style={{ maxWidth: '100%', display: 'block' }} />
+  return <canvas ref={canvasRef} width={520} height={520} style={{ maxWidth: '100%', display: 'block' }} />
 })
 SpinningWheel.displayName = 'SpinningWheel'
 
@@ -915,11 +918,6 @@ function ParticipantAvatar({ participant, size, highlight }: { participant: Part
   return inner
 }
 
-function ParticipantAvatarById({ participantId, buyers }: { participantId: number; buyers: Buyer[] }) {
-  const participant = buyers.find(b => b.participant.id === participantId)?.participant
-  if (!participant) return null
-  return <ParticipantAvatar participant={participant} />
-}
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {

@@ -69,6 +69,7 @@ data class ParticipantStatsDto(
     val participantId: Long,
     val name: String,
     val tag: String,
+    val hasPhoto: Boolean,
     val ticketsBought: Long,
     val wins: Long,
     val winRatio: Double

@@ -59,7 +59,10 @@ class LotteryService(
 
     fun getBuyers(): List<BuyerDto> {
         val lottery = getCurrentLottery() ?: return emptyList()
-        val tickets = ticketRepo.findAllByLotteryWithParticipant(lottery)
+        val tickets = if (lottery.status == LotteryStatus.DRAWING)
+            ticketRepo.findAllByLotteryAndWonWithParticipant(lottery, false)
+        else
+            ticketRepo.findAllByLotteryWithParticipant(lottery)
         val totalTickets = tickets.size.toLong()
 
         return tickets.groupBy { it.participant.id }
@@ -213,9 +216,9 @@ class LotteryService(
         return AllTimeStatisticsDto(
             totalLotteries = closedLotteries.size,
             totalParticipants = participantStats.size,
-            topLucky = participantStats.filter { it.lotteriesParticipated >= 2 }
+            topLucky = participantStats.filter { it.lotteriesParticipated >= 1 }
                 .sortedByDescending { if (it.totalTicketsBought > 0) it.totalWins.toDouble() / it.totalTicketsBought else 0.0 }.take(5),
-            topUnlucky = participantStats.filter { it.lotteriesParticipated >= 2 }
+            topUnlucky = participantStats.filter { it.lotteriesParticipated >= 1 }
                 .sortedWith(compareBy({ if (it.totalTicketsBought > 0) it.totalWins.toDouble() / it.totalTicketsBought else 0.0 }, { -it.totalTicketsBought })).take(5),
             topTicketBuyers = participantStats.sortedByDescending { it.totalTicketsBought }.take(10),
             longestWinStreak = longestWinStreak?.takeIf { it.streak > 1 },
@@ -238,6 +241,7 @@ class LotteryService(
                 participantId = p.id,
                 name = p.name,
                 tag = p.tag,
+                hasPhoto = p.photoData != null,
                 ticketsBought = pTickets.size.toLong(),
                 wins = wins,
                 winRatio = if (pTickets.isNotEmpty()) wins.toDouble() / pTickets.size else 0.0

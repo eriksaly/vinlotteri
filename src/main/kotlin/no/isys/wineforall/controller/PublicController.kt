@@ -20,6 +20,9 @@ class PublicController(private val lotteryService: LotteryService) {
     @GetMapping("/statistics")
     fun getAllTimeStatistics() = lotteryService.getAllTimeStatistics()
 
+    @GetMapping("/statistics/lotteries")
+    fun getAllLotteryStatistics() = lotteryService.getAllStatistics()
+
     @GetMapping("/participants/{id}/photo")
     fun getParticipantPhoto(@PathVariable id: Long): ResponseEntity<ByteArray> {
         val (data, contentType) = lotteryService.getParticipantPhoto(id)

@@ -119,6 +119,11 @@ export default function LotteryInfoPage() {
           )}
         </div>
       </div>
+      <footer style={{ textAlign: 'center', padding: '2rem 1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem', borderTop: '1px solid var(--border)', marginTop: '1rem' }}>
+        🔒 Dette lotteriet er et internt kontorarrangement forbeholdt ansatte i Integrasjonssystemer AS.<br />
+        Deltakelse er frivillig. Organisert i henhold til norsk lotteriveiledning for lukkede kretser.<br />
+        Ikke åpent for offentligheten.
+      </footer>
     </div>
   )
 }

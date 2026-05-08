@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
-import type { AllTimeStatistics, Streak } from '../types'
+import type { AllTimeStatistics, LotteryStatistics, Streak } from '../types'
 
 export default function StatisticsPage() {
   const [stats, setStats] = useState<AllTimeStatistics | null>(null)
+  const [lotteries, setLotteries] = useState<LotteryStatistics[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedLottery, setExpandedLottery] = useState<number | null>(null)
 
   useEffect(() => {
     api.get<AllTimeStatistics>('/api/statistics')
       .then(r => setStats(r.data))
       .catch(() => {})
       .finally(() => setLoading(false))
+    api.get<LotteryStatistics[]>('/api/statistics/lotteries')
+      .then(r => {
+        setLotteries(r.data)
+        if (r.data.length > 0) setExpandedLottery(r.data[0].lotteryId)
+      })
+      .catch(() => {})
   }, [])
 
   return (
@@ -53,11 +61,44 @@ export default function StatisticsPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
+              {/* Latest lottery winners */}
+              {lotteries.length > 0 && lotteries[0].winners.length > 0 && (
+                <div className="card">
+                  <div className="card-header" style={{ background: 'var(--wine)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    🏆 Siste trekning — {lotteries[0].lotteryName}
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr><th>#</th><th>Tag</th><th>Lodd</th></tr>
+                      </thead>
+                      <tbody>
+                        {lotteries[0].winners.map(w => {
+                          const p = lotteries[0].participants.find(p => p.participantId === w.participantId)
+                          return (
+                            <tr key={w.position}>
+                              <td><span style={{ fontSize: '1.1rem' }}>#{w.position}</span></td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                  {p && <MiniAvatar participant={p} />}
+                                  <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
+                                </div>
+                              </td>
+                              <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>#{w.ticketNumber}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Header summary */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
                 <StatCard emoji="🍾" label="Lotterier avholdt" value={stats.totalLotteries.toString()} />
                 <StatCard emoji="🧑‍🤝‍🧑" label="Ivrige loddkjøpere" value={stats.totalParticipants.toString()} />
-                <StatCard emoji="🎟️" label="Lodd kjøpt totalt" value={stats.topTicketBuyers.reduce((s, p) => s + p.totalTicketsBought, 0).toString()} />
+                <StatCard emoji="🎟️" label="Lodd kjøpt totalt" value={lotteries.reduce((s, l) => s + l.totalTickets, 0).toString()} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
@@ -71,7 +112,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Navn</th><th>Vinnersjanser brukt</th></tr>
+                          <tr><th>#</th><th>Tag</th><th>Vinnersjanser brukt</th></tr>
                         </thead>
                         <tbody>
                           {stats.topLucky.map((p, i) => (
@@ -81,7 +122,7 @@ export default function StatisticsPage() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                   <MiniAvatar participant={p} />
                                   <div>
-                                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                    <span style={{ fontWeight: 600 }}>{p.tag}</span>
                                     {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Gjeldende vinkjær</div>}
                                   </div>
                                 </div>
@@ -111,7 +152,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Navn</th><th>Livets urettferdighet</th></tr>
+                          <tr><th>#</th><th>Tag</th><th>Livets urettferdighet</th></tr>
                         </thead>
                         <tbody>
                           {stats.topUnlucky.map((p, i) => (
@@ -122,9 +163,7 @@ export default function StatisticsPage() {
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                   <MiniAvatar participant={p} />
-                                  <div>
-                                    <span style={{ fontWeight: 600 }}>{p.name}</span>
-                                  </div>
+                                  <span style={{ fontWeight: 600 }}>{p.tag}</span>
                                 </div>
                               </td>
                               <td>
@@ -153,7 +192,7 @@ export default function StatisticsPage() {
                 <div style={{ overflowX: 'auto' }}>
                   <table className="table">
                     <thead>
-                      <tr><th>#</th><th>Navn</th><th>Lodd kjøpt</th><th>Viner vunnet</th><th>Deltatt i</th></tr>
+                      <tr><th>#</th><th>Tag</th><th>Lodd kjøpt</th><th>Viner vunnet</th><th>Deltatt i</th></tr>
                     </thead>
                     <tbody>
                       {stats.topTicketBuyers.map((p, i) => (
@@ -162,7 +201,7 @@ export default function StatisticsPage() {
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                               <MiniAvatar participant={p} />
-                              <span style={{ fontWeight: 600 }}>{p.name}</span>
+                              <span style={{ fontWeight: 600 }}>{p.tag}</span>
                             </div>
                           </td>
                           <td style={{ fontWeight: 700 }}>
@@ -197,6 +236,109 @@ export default function StatisticsPage() {
                 </div>
               )}
 
+              {/* Per-lottery results */}
+              {lotteries.length > 0 && (
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--wine)' }}>
+                    🍾 Trekkingsarkiv
+                  </h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {lotteries.map(lottery => (
+                      <div key={lottery.lotteryId} className="card">
+                        <button
+                          onClick={() => setExpandedLottery(expandedLottery === lottery.lotteryId ? null : lottery.lotteryId)}
+                          style={{
+                            width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            gap: '1rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <span style={{ fontSize: '1.3rem' }}>🍷</span>
+                            <div>
+                              <div style={{ fontWeight: 700 }}>{lottery.lotteryName}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {lottery.winners.length} vinnere · {lottery.totalTickets} lodd · {lottery.totalAmountNok} kr
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              {lottery.winners.map(w => (
+                                <span key={w.position} className="badge badge-wine" style={{ fontSize: '0.7rem' }}>
+                                  #{w.position} {w.participantTag}
+                                </span>
+                              ))}
+                            </div>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', flexShrink: 0 }}>
+                              {expandedLottery === lottery.lotteryId ? '▲' : '▼'}
+                            </span>
+                          </div>
+                        </button>
+
+                        {expandedLottery === lottery.lotteryId && (
+                          <div style={{ borderTop: '1px solid var(--border)' }}>
+                            {/* Winners list */}
+                            <div style={{ padding: '1rem 1.5rem 0.5rem' }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Vinnere
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {lottery.winners.map(w => {
+                                  const p = lottery.participants.find(p => p.participantId === w.participantId)
+                                  return (
+                                    <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                      <span style={{ fontWeight: 800, color: 'var(--wine)', minWidth: '1.5rem', fontSize: '1.1rem' }}>
+                                        {`#${w.position}`}
+                                      </span>
+                                      {p && <MiniAvatar participant={p} />}
+                                      <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
+                                      <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                        lodd #{w.ticketNumber}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Participant table */}
+                            <div style={{ overflowX: 'auto', padding: '0.5rem 0 0' }}>
+                              <table className="table">
+                                <thead>
+                                  <tr><th>Deltaker</th><th>Lodd</th><th>Andel</th><th>Gevinst</th></tr>
+                                </thead>
+                                <tbody>
+                                  {lottery.participants.map(p => (
+                                    <tr key={p.participantId}>
+                                      <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                          <MiniAvatar participant={p} />
+                                          <span style={{ fontWeight: 600 }}>{p.tag}</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ fontWeight: 700 }}>{p.ticketsBought}</td>
+                                      <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                        {lottery.totalTickets > 0 ? (p.ticketsBought / lottery.totalTickets * 100).toFixed(1) : 0}%
+                                      </td>
+                                      <td>
+                                        {p.wins > 0
+                                          ? <span style={{ color: 'var(--success)', fontWeight: 700 }}>🍾 {p.wins}</span>
+                                          : <span style={{ color: 'var(--text-muted)' }}>–</span>}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 🍷 Ingen viner ble skadet i produksjonen av denne statistikken 🍷
               </div>
@@ -205,6 +347,11 @@ export default function StatisticsPage() {
           )}
         </div>
       </div>
+      <footer style={{ textAlign: 'center', padding: '2rem 1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem', borderTop: '1px solid var(--border)', marginTop: '1rem' }}>
+        🔒 Dette lotteriet er et internt kontorarrangement forbeholdt ansatte i Integrasjonssystmer AS.<br />
+        Deltakelse er frivillig. Organisert i henhold til norsk lotteriveiledning for lukkede kretser.<br />
+        Ikke åpent for offentligheten.
+      </footer>
     </div>
   )
 }
@@ -219,7 +366,7 @@ function StreakCard({ streak, type }: { streak: Streak; type: 'win' | 'lose' }) 
       <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <MiniAvatar participant={streak} size="lg" />
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{streak.name}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{streak.tag}</div>
           <div style={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '0.1em' }}>
             {isWin
               ? Array(streak.streak).fill('🍷').join('')
@@ -249,14 +396,8 @@ function MedalBadge({ rank }: { rank: number }) {
 function MiniAvatar({ participant, size }: { participant: { participantId?: number; id?: number; tag: string; hasPhoto: boolean }; size?: string }) {
   const id = participant.participantId ?? participant.id
   const cls = `avatar${size === 'lg' ? ' avatar-lg' : ''}`
-  if (participant.hasPhoto && id) {
-    return <img src={`/api/participants/${id}/photo`} alt={participant.tag} className={cls} />
-  }
-  return (
-    <div className={cls} style={{ background: tagColor(participant.tag) }}>
-      {participant.tag.toUpperCase()}
-    </div>
-  )
+  if (!participant.hasPhoto || !id) return null
+  return <img src={`/api/participants/${id}/photo`} alt={participant.tag} className={cls} />
 }
 
 function StatCard({ emoji, label, value, sub }: { emoji: string; label: string; value: string; sub?: string }) {
@@ -270,11 +411,4 @@ function StatCard({ emoji, label, value, sub }: { emoji: string; label: string; 
       </div>
     </div>
   )
-}
-
-function tagColor(tag: string) {
-  const colors = ['#722F37', '#2d4a7a', '#2d7a5a', '#7a4a2d', '#5a2d7a', '#7a2d6a']
-  let hash = 0
-  for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
 }

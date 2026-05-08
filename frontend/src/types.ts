@@ -54,6 +54,28 @@ export interface Streak {
   lotteriesParticipated: number
 }
 
+export interface LotteryParticipantStats {
+  participantId: number
+  name: string
+  tag: string
+  hasPhoto: boolean
+  ticketsBought: number
+  wins: number
+  winRatio: number
+}
+
+export interface LotteryStatistics {
+  lotteryId: number
+  lotteryName: string
+  createdAt: string
+  totalTickets: number
+  totalAmountNok: number
+  winners: Winner[]
+  participants: LotteryParticipantStats[]
+  luckiest: LotteryParticipantStats | null
+  unluckiest: LotteryParticipantStats | null
+}
+
 export interface AllTimeStatistics {
   totalLotteries: number
   totalParticipants: number
