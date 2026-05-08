@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../../api/client'
 
@@ -7,7 +7,14 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    api.get('/api/admin/me')
+      .then(() => navigate('/admin/dashboard', { replace: true }))
+      .catch(() => setChecking(false))
+  }, [navigate])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -27,6 +34,8 @@ export default function Login() {
       setLoading(false)
     }
   }
+
+  if (checking) return null
 
   return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--wine)' }}>
