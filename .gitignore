@@ -35,3 +35,6 @@ build/
 ### Local secrets ###
 src/main/resources/application-local.yaml
 frontend/node_modules/
+
+### Frontend build output ###
+src/main/resources/static/
