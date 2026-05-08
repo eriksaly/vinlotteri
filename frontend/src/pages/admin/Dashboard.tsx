@@ -768,7 +768,7 @@ function ParticipantAutocomplete({
       {open && filtered.length > 0 && (
         <div style={{
           position: 'absolute', zIndex: 100, top: 'calc(100% + 2px)', left: 0, right: 0,
-          background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+          background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
           boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
         }}>
           {filtered.map((p, i) => (
