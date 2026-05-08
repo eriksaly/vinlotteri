@@ -132,6 +132,7 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
   const [buyers, setBuyers] = useState<Buyer[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | ''>('')
+  const [selectedParticipantLabel, setSelectedParticipantLabel] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [amount, setAmount] = useState('')
   const [error, setError] = useState('')
@@ -156,6 +157,7 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
       setBuyers(r.data)
       await onLotteryChange()
       setSelectedParticipantId('')
+      setSelectedParticipantLabel('')
       setQuantity(1)
       setAmount('')
     } catch (e: unknown) {
@@ -188,16 +190,11 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
                 <label>Deltaker</label>
-                <select
-                  className="form-control"
-                  value={selectedParticipantId}
-                  onChange={e => setSelectedParticipantId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">Velg deltaker...</option>
-                  {participants.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.tag})</option>
-                  ))}
-                </select>
+                <ParticipantAutocomplete
+                  participants={participants}
+                  value={selectedParticipantLabel}
+                  onChange={(id, label) => { setSelectedParticipantId(id); setSelectedParticipantLabel(label) }}
+                />
               </div>
               <div className="form-group" style={{ flex: '0 0 110px', marginBottom: 0 }}>
                 <label>Vipps-beløp (kr)</label>
@@ -709,6 +706,90 @@ function PhotoUploadButton({ participantId, hasPhoto, uploading, onUpload }: {
         {uploading ? '⏳' : hasPhoto ? '📷 Bytt bilde' : '📷 Last opp'}
       </button>
     </>
+  )
+}
+
+// ─── Participant Autocomplete ─────────────────────────────────────────────────
+
+function ParticipantAutocomplete({
+  participants,
+  value,
+  onChange,
+}: {
+  participants: Participant[]
+  value: string
+  onChange: (id: number | '', label: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [highlighted, setHighlighted] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const filtered = value.trim() === ''
+    ? participants
+    : participants.filter(p =>
+        p.name.toLowerCase().includes(value.toLowerCase()) ||
+        p.tag.toLowerCase().includes(value.toLowerCase())
+      )
+
+  useEffect(() => { setHighlighted(0) }, [value])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const select = (p: Participant) => {
+    onChange(p.id, `${p.name} (${p.tag})`)
+    setOpen(false)
+  }
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (!open) { if (e.key === 'ArrowDown' || e.key === 'Enter') setOpen(true); return }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(i => Math.min(i + 1, filtered.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[highlighted]) select(filtered[highlighted]) }
+    else if (e.key === 'Escape') setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <input
+        className="form-control"
+        placeholder="Søk navn eller tag..."
+        value={value}
+        onChange={e => { onChange('', e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKey}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute', zIndex: 100, top: 'calc(100% + 2px)', left: 0, right: 0,
+          background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+        }}>
+          {filtered.map((p, i) => (
+            <div
+              key={p.id}
+              onMouseDown={() => select(p)}
+              onMouseEnter={() => setHighlighted(i)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: '0.5rem 0.75rem', cursor: 'pointer',
+                background: i === highlighted ? 'rgba(114,47,55,0.08)' : 'transparent',
+              }}
+            >
+              <ParticipantAvatar participant={p} />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{p.name}</span>
+              <span className="badge badge-wine" style={{ marginLeft: 'auto' }}>{p.tag}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
