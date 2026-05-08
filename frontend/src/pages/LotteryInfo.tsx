@@ -1,15 +1,4 @@
 import { useEffect, useState } from 'react'
-
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace React.JSX {
-    interface IntrinsicElements {
-      'vipps-mobilepay-button': React.HTMLAttributes<HTMLElement> & {
-        brand?: string; language?: string; variant?: string; verb?: string; rounded?: string; branded?: string
-      }
-    }
-  }
-}
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { LotteryInfo } from '../types'
@@ -82,9 +71,7 @@ export default function LotteryInfoPage() {
 
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center' }}>
-                  <a href={`vipps://?phone=${lottery.vippsNumber}`} style={{ display: 'inline-block', textDecoration: 'none' }}>
-                    <vipps-mobilepay-button brand="vipps" language="no" variant="orange" verb="pay" rounded="true" branded="true" />
-                  </a>
+                  <VippsButton number={lottery.vippsNumber} />
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                     {lottery.pricePerTicket} kr per lodd
                   </div>
@@ -132,6 +119,35 @@ export default function LotteryInfoPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function VippsButton({ number }: { number: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(number).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+      <button
+        onClick={copy}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+          background: '#FF5B24', color: 'white', border: 'none', cursor: 'pointer',
+          padding: '0.7rem 1.6rem', borderRadius: '999px',
+          fontWeight: 700, fontSize: '1.2rem',
+          boxShadow: '0 3px 12px rgba(255,91,36,0.4)',
+        }}
+      >
+        {copied ? '✓ Kopiert!' : `Kopier Vipps-nummer`}
+      </button>
+      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        {copied ? `${number} er kopiert — lim inn i Vipps` : `Trykk for å kopiere ${number}`}
+      </span>
     </div>
   )
 }
