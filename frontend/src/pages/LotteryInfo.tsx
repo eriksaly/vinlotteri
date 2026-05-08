@@ -53,7 +53,7 @@ export default function LotteryInfoPage() {
                     <div>
                       <strong>Send Vipps til vinsjefen</strong><br />
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        {lottery.pricePerTicket} kr per lodd til <a href={`vipps://?phone=${lottery.vippsNumber}`} style={{ color: 'var(--wine)', fontWeight: 700 }}>#{lottery.vippsNumber}</a>. Billigere enn en kopp kaffe. Mye morsommere.
+                        {lottery.pricePerTicket} kr per lodd til <a href={`vipps://?phone=${lottery.vippsNumber}`} style={{ color: 'var(--wine)', fontWeight: 700 }}>{lottery.vippsNumber}</a>. Billigere enn en kopp kaffe. Mye morsommere.
                       </span>
                     </div>
                   </div>
@@ -71,16 +71,26 @@ export default function LotteryInfoPage() {
 
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Vipps-nummer
-                  </div>
                   <a
                     href={`vipps://?phone=${lottery.vippsNumber}`}
-                    style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--wine)', textDecoration: 'none', display: 'block' }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+                      background: '#FF5B24', color: 'white', textDecoration: 'none',
+                      padding: '0.75rem 1.5rem', borderRadius: '999px',
+                      fontWeight: 800, fontSize: '1.2rem', letterSpacing: '0.01em',
+                      boxShadow: '0 4px 14px rgba(255,91,36,0.35)',
+                      transition: 'transform 0.1s, box-shadow 0.1s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.04)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1)' }}
                   >
-                    #{lottery.vippsNumber} 📲
+                    <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="32" cy="32" r="32" fill="white" fillOpacity="0.2"/>
+                      <text x="32" y="42" textAnchor="middle" fontSize="30" fill="white">V</text>
+                    </svg>
+                    Betal #{lottery.vippsNumber}
                   </a>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.3rem' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                     {lottery.pricePerTicket} kr per lodd
                   </div>
                   <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
