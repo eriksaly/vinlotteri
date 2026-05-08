@@ -87,7 +87,7 @@ export function playWin() {
     tone(c, 261, now + 1.35, 1.5, 0.30, 'triangle')
 
     // Final chord burst (C major) at the end
-    [523, 659, 784, 1047].forEach(f => tone(c, f, now + 1.35, 1.5, 0.12))
+    ;[523, 659, 784, 1047].forEach((f: number) => tone(c, f, now + 1.35, 1.5, 0.12))
 
     // Extra percussion on the beat
     noise(c, now + 0.54, 0.1, 0.4, 3000)
