@@ -183,7 +183,7 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {isOpen && (
-        <div className="card">
+        <div className="card" style={{ overflow: 'visible' }}>
           <div className="card-header">Legg til loddkjøp</div>
           <div className="card-body">
             {error && <div className="alert alert-error">{error}</div>}
