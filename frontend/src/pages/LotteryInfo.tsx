@@ -53,7 +53,7 @@ export default function LotteryInfoPage() {
                     <div>
                       <strong>Send Vipps til vinsjefen</strong><br />
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        {lottery.pricePerTicket} kr per lodd til <strong style={{ color: 'var(--wine)' }}>#{lottery.vippsNumber}</strong>. Billigere enn en kopp kaffe. Mye morsommere.
+                        {lottery.pricePerTicket} kr per lodd til <strong style={{ color: 'var(--wine)' }}>{lottery.vippsNumber}</strong>. Billigere enn en kopp kaffe. Mye morsommere.
                       </span>
                     </div>
                   </div>
