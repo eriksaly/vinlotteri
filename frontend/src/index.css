@@ -122,10 +122,10 @@ a:hover { text-decoration: underline; }
 
 /* Nav */
 .nav { background: var(--wine); color: white; padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-.nav-inner { max-width: 1300px; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; gap: 2rem; height: 56px; }
-.nav-brand { font-size: 1.15rem; font-weight: 800; color: white; display: flex; align-items: center; gap: 0.5rem; }
-.nav-links { display: flex; gap: 1rem; margin-left: auto; }
-.nav-link { color: rgba(255,255,255,0.8); font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.6rem; border-radius: 6px; transition: all 0.15s; }
+.nav-inner { max-width: 1300px; margin: 0 auto; padding: 0 1rem; display: flex; align-items: center; gap: 1rem; min-height: 56px; flex-wrap: wrap; }
+.nav-brand { font-size: 1.1rem; font-weight: 800; color: white; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.nav-links { display: flex; gap: 0.5rem; margin-left: auto; align-items: center; flex-wrap: wrap; }
+.nav-link { color: rgba(255,255,255,0.8); font-size: 0.85rem; font-weight: 500; padding: 0.35rem 0.5rem; border-radius: 6px; transition: all 0.15s; white-space: nowrap; }
 .nav-link:hover { color: white; background: rgba(255,255,255,0.15); text-decoration: none; }
 
 /* Page */
