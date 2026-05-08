@@ -1,4 +1,15 @@
 import { useEffect, useState } from 'react'
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace React.JSX {
+    interface IntrinsicElements {
+      'vipps-mobilepay-button': React.HTMLAttributes<HTMLElement> & {
+        brand?: string; language?: string; variant?: string; verb?: string; rounded?: string; branded?: string
+      }
+    }
+  }
+}
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { LotteryInfo } from '../types'
@@ -71,24 +82,8 @@ export default function LotteryInfoPage() {
 
               <div className="card">
                 <div className="card-body" style={{ textAlign: 'center' }}>
-                  <a
-                    href={`vipps://?phone=${lottery.vippsNumber}`}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
-                      background: '#FF5B24', color: 'white', textDecoration: 'none',
-                      padding: '0.75rem 1.5rem', borderRadius: '999px',
-                      fontWeight: 800, fontSize: '1.2rem', letterSpacing: '0.01em',
-                      boxShadow: '0 4px 14px rgba(255,91,36,0.35)',
-                      transition: 'transform 0.1s, box-shadow 0.1s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.04)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1)' }}
-                  >
-                    <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="32" cy="32" r="32" fill="white" fillOpacity="0.2"/>
-                      <text x="32" y="42" textAnchor="middle" fontSize="30" fill="white">V</text>
-                    </svg>
-                    Betal #{lottery.vippsNumber}
+                  <a href={`vipps://?phone=${lottery.vippsNumber}`} style={{ display: 'inline-block', textDecoration: 'none' }}>
+                    <vipps-mobilepay-button brand="vipps" language="no" variant="orange" verb="pay" rounded="true" branded="true" />
                   </a>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                     {lottery.pricePerTicket} kr per lodd
