@@ -79,7 +79,7 @@ export default function Dashboard() {
           <span className="nav-brand">🍷 Vinsjefen</span>
           <div className="nav-links">
             <Link to="/" className="nav-link">Forside</Link>
-            <Link to="/statistikk" className="nav-link">Hall of Fame</Link>
+            <Link to="/statistikk" className="nav-link">Hall of Vino</Link>
             <button onClick={logout} className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}>🚪 Lås kjelleren</button>
           </div>
         </div>
