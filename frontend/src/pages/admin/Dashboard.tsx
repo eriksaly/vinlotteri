@@ -288,7 +288,7 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
   const [animating, setAnimating] = useState(false)
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null)
   const [latestWinner, setLatestWinner] = useState<Winner | null>(null)
-  const [remainingTickets, setRemainingTickets] = useState<number>(0)
+  const [, setRemainingTickets] = useState<number>(0)
   const [wineCount, setWineCount] = useState(5)
   const [showStartForm, setShowStartForm] = useState(false)
   const { confirm, dialog } = useConfirm()
