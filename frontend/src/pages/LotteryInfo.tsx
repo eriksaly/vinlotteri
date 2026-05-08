@@ -53,7 +53,7 @@ export default function LotteryInfoPage() {
                     <div>
                       <strong>Send Vipps til vinsjefen</strong><br />
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                        {lottery.pricePerTicket} kr per lodd til <strong style={{ color: 'var(--wine)' }}>{lottery.vippsNumber}</strong>. Billigere enn en kopp kaffe. Mye morsommere.
+                        {lottery.pricePerTicket} kr per lodd til <a href={`vipps://?phone=${lottery.vippsNumber}`} style={{ color: 'var(--wine)', fontWeight: 700 }}>#{lottery.vippsNumber}</a>. Billigere enn en kopp kaffe. Mye morsommere.
                       </span>
                     </div>
                   </div>
@@ -74,9 +74,12 @@ export default function LotteryInfoPage() {
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Vipps-nummer
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--wine)' }}>
-                    {lottery.vippsNumber}
-                  </div>
+                  <a
+                    href={`vipps://?phone=${lottery.vippsNumber}`}
+                    style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--wine)', textDecoration: 'none', display: 'block' }}
+                  >
+                    #{lottery.vippsNumber} 📲
+                  </a>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.3rem' }}>
                     {lottery.pricePerTicket} kr per lodd
                   </div>
