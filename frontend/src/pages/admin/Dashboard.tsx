@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, ReactNode, forwardRef, useImp
 import { useNavigate, Link } from 'react-router-dom'
 import confetti from 'canvas-confetti'
 import api from '../../api/client'
+import { playTick, playWin } from '../../audio'
 import type { Buyer, LotteryInfo, Participant, Winner, DrawResult } from '../../types'
 
 // ─── Modal ───────────────────────────────────────────────────────────────────
@@ -759,13 +760,17 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
         let phase: 'fast' | 'decel' = 'fast'
         let decelFrom = 0, decelTarget = 0, decelT0 = 0
         const DECEL_MS = 8000
+        const TICK_INTERVAL = Math.PI / 7
+        let lastTickAngle = startAngle
         const loop = () => {
           const now = performance.now()
           let a: number
+          let speed = 1
           if (phase === 'fast') {
             a = startAngle + FAST * (now - t0)
           } else {
             const p = Math.min(1, (now - decelT0) / DECEL_MS)
+            speed = 1 - p
             a = decelFrom + (decelTarget - decelFrom) * (1 - Math.pow(1 - p, 3))
             if (p >= 1) {
               angleRef.current = decelTarget
@@ -773,6 +778,10 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
               drawWheelFrame(canvasRef.current, decelTarget, snap)
               resolve(); return
             }
+          }
+          if (Math.abs(a - lastTickAngle) >= TICK_INTERVAL) {
+            playTick(speed)
+            lastTickAngle = a
           }
           angleRef.current = a
           drawWheelFrame(canvasRef.current, a, snap)
@@ -930,6 +939,7 @@ function tagColor(tag: string) {
 }
 
 function fireConfetti() {
+  playWin()
   const end = Date.now() + 3500
   const colors = ['#722F37', '#C5A028', '#ffffff', '#9b4a54']
   const frame = () => {
