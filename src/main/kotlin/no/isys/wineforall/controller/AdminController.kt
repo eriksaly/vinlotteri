@@ -71,6 +71,12 @@ class AdminController(
     fun addBuyer(@RequestBody req: AddBuyerRequest) =
         lotteryService.addBuyer(req.participantId, req.quantity)
 
+    @PutMapping("/buyers/{participantId}")
+    fun updateBuyer(
+        @PathVariable participantId: Long,
+        @RequestBody req: UpdateBuyerRequest
+    ) = lotteryService.updateBuyer(participantId, req.quantity)
+
     @DeleteMapping("/buyers/{participantId}")
     fun removeBuyer(@PathVariable participantId: Long) =
         lotteryService.removeBuyer(participantId)

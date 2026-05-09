@@ -137,6 +137,8 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
   const [quantity, setQuantity] = useState(1)
   const [amount, setAmount] = useState('')
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editAmount, setEditAmount] = useState('')
   const { confirm, dialog } = useConfirm()
 
   const load = useCallback(async () => {
@@ -149,6 +151,28 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const startEdit = (b: Buyer) => {
+    setEditingId(b.participant.id)
+    setEditAmount(String(b.ticketCount * (lottery?.pricePerTicket ?? 5)))
+  }
+
+  const cancelEdit = () => { setEditingId(null); setEditAmount('') }
+
+  const saveEdit = async (participantId: number) => {
+    const kr = parseInt(editAmount) || 0
+    const price = lottery?.pricePerTicket ?? 5
+    const newQuantity = Math.max(1, Math.floor(kr / price))
+    try {
+      const r = await api.put<Buyer[]>(`/api/admin/buyers/${participantId}`, { quantity: newQuantity })
+      setBuyers(r.data)
+      await onLotteryChange()
+      setEditingId(null)
+      setEditAmount('')
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
+    }
+  }
 
   const addBuyer = async () => {
     if (!selectedParticipantId) return
@@ -247,26 +271,60 @@ function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; 
               <div key={b.participant.id} style={{
                 display: 'flex', alignItems: 'center', gap: '0.75rem',
                 padding: '0.6rem 0.8rem', borderRadius: 8,
-                background: 'var(--bg)', border: '1.5px solid var(--border)',
+                background: 'var(--bg)', border: editingId === b.participant.id ? '1.5px solid var(--wine)' : '1.5px solid var(--border)',
               }}>
                 <ParticipantAvatar participant={b.participant} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {b.participant.name}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {b.ticketCount} lodd · {b.ticketCount * (lottery?.pricePerTicket ?? 5)} kr
-                  </div>
-                  <div style={{ marginTop: '0.3rem', height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ width: `${b.ticketPercentage}%`, height: '100%', background: 'var(--wine)', borderRadius: 2 }} />
-                  </div>
+                  {editingId === b.participant.id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
+                      <input
+                        className="form-control"
+                        type="number"
+                        min={lottery?.pricePerTicket ?? 5}
+                        step={lottery?.pricePerTicket ?? 5}
+                        value={editAmount}
+                        onChange={e => setEditAmount(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveEdit(b.participant.id); if (e.key === 'Escape') cancelEdit() }}
+                        autoFocus
+                        onFocus={e => e.target.select()}
+                        style={{ width: 70, padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        kr = {Math.max(1, Math.floor((parseInt(editAmount) || 0) / (lottery?.pricePerTicket ?? 5)))} lodd
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {b.ticketCount} lodd · {b.ticketCount * (lottery?.pricePerTicket ?? 5)} kr
+                    </div>
+                  )}
+                  {editingId === b.participant.id ? (
+                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
+                      <button className="btn btn-primary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={() => saveEdit(b.participant.id)}>Lagre</button>
+                      <button className="btn btn-outline btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={cancelEdit}>Avbryt</button>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '0.3rem', height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${b.ticketPercentage}%`, height: '100%', background: 'var(--wine)', borderRadius: 2 }} />
+                    </div>
+                  )}
                 </div>
-                {isOpen && (
-                  <button
-                    onClick={() => removeBuyer(b.participant.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0.2rem', lineHeight: 1, flexShrink: 0 }}
-                    title="Fjern"
-                  >✕</button>
+                {isOpen && editingId !== b.participant.id && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flexShrink: 0 }}>
+                    <button
+                      onClick={() => startEdit(b)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.2rem', lineHeight: 1 }}
+                      title="Rediger"
+                    >✏️</button>
+                    <button
+                      onClick={() => removeBuyer(b.participant.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0.2rem', lineHeight: 1 }}
+                      title="Fjern"
+                    >✕</button>
+                  </div>
                 )}
               </div>
             ))}

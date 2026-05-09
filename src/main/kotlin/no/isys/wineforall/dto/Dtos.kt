@@ -20,6 +20,10 @@ data class AddBuyerRequest(
     val quantity: Int
 )
 
+data class UpdateBuyerRequest(
+    val quantity: Int
+)
+
 data class CreateLotteryRequest(
     val name: String
 )
