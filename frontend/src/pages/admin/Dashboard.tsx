@@ -288,8 +288,18 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
   const [, setRemainingTickets] = useState<number>(0)
   const [wineCount, setWineCount] = useState(5)
   const [showStartForm, setShowStartForm] = useState(false)
+  const [showWheel, setShowWheel] = useState(false)
   const { confirm, dialog } = useConfirm()
   const wheelRef = useRef<WheelHandle>(null)
+
+  useEffect(() => {
+    if (!showWheel) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !animating) setShowWheel(false)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showWheel, animating])
 
   const load = useCallback(async () => {
     const [w, b] = await Promise.all([
@@ -321,8 +331,12 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
 
   const drawWinner = async () => {
     if (animating) return
+    setShowWheel(true)
     setAnimating(true)
     setLatestWinner(null)
+
+    // Wait two frames for overlay to mount and ResizeObserver to fire
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
 
     let resolveWinner!: (v: { participantId: number; ticketNumber: number }) => void
     let rejectWinner!: (e: unknown) => void
@@ -343,6 +357,7 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
     } catch (e: unknown) {
       rejectWinner(e)
       setAnimating(false)
+      setShowWheel(false)
       alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved trekning')
     }
   }
@@ -360,6 +375,7 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
   const isOpen = lottery?.status === 'OPEN'
   const isDrawing = lottery?.status === 'DRAWING'
   const totalTickets = buyers.reduce((s, b) => s + b.ticketCount, 0)
+  const allDrawn = winners.length >= (lottery?.wineCount ?? 999)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -404,7 +420,9 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
                 alignItems: 'center',
                 gap: '1.2rem',
               }}>
-                <SpinningWheel ref={wheelRef} buyers={buyers} />
+                <div style={{ width: 520, height: 520, maxWidth: '100%', aspectRatio: '1' }}>
+                  {!showWheel && <SpinningWheel ref={wheelRef} buyers={buyers} />}
+                </div>
 
                 {latestWinner && !animating && (
                   <div style={{ color: 'white', textAlign: 'center' }}>
@@ -422,9 +440,9 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
                   <button
                     className="btn btn-gold btn-xl"
                     onClick={drawWinner}
-                    disabled={animating || winners.length >= (lottery?.wineCount ?? 999)}
+                    disabled={animating || allDrawn}
                   >
-                    {animating ? '🎰 Skjebnen avgjøres...' : winners.length >= (lottery?.wineCount ?? 999) ? '🏁 Kjelleren er tom!' : '🎰 Trekk vin'}
+                    {animating ? '🎰 Skjebnen avgjøres...' : allDrawn ? '🏁 Kjelleren er tom!' : '🎰 Trekk vin'}
                   </button>
                   {lottery?.wineCount != null && winners.length < lottery.wineCount && !animating && (
                     <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem' }}>
@@ -473,6 +491,107 @@ function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null;
               )}
             </div>
           </div>
+
+          {/* Full-screen wheel overlay */}
+          {showWheel && (
+            <div
+              onClick={() => { if (!animating && winners.length < (lottery?.wineCount ?? 999)) drawWinner() }}
+              style={{
+              position: 'fixed', inset: 0, zIndex: OVERLAY_Z,
+              background: 'linear-gradient(135deg, #1a0a0d 0%, #2a1215 30%, #1a0a0d 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: animating || allDrawn ? 'default' : 'pointer',
+            }}>
+              {/* Close button */}
+              {!animating && (
+                <button
+                  onClick={e => { e.stopPropagation(); setShowWheel(false) }}
+                  style={{
+                    position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 10,
+                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                    color: 'white', width: 44, height: 44, borderRadius: '50%',
+                    fontSize: '1.3rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >✕</button>
+              )}
+
+              {/* Wheel */}
+              <div style={{
+                width: '100vw', height: '100vh',
+                position: 'relative',
+                opacity: latestWinner && !animating ? 0.3 : 1,
+                transition: 'opacity 0.5s',
+              }}>
+                <SpinningWheel ref={wheelRef} buyers={buyers} />
+              </div>
+
+              {/* Winner announcement — centered on top of wheel */}
+              {latestWinner && !animating && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}>
+                  <div style={{
+                    color: 'white', textAlign: 'center',
+                    animation: 'modal-in 0.4s ease-out',
+                  }}>
+                    <div style={{ fontSize: 'min(16vw, 16vh)', fontWeight: 800, lineHeight: 1.1 }}>
+                      🏆 {latestWinner.participantTag}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'min(4vw, 4vh)', marginTop: '0.5rem' }}>
+                      {latestWinner.participantName}
+                    </div>
+                    <div style={{ color: '#e8c84a', fontSize: 'min(5vw, 5vh)', marginTop: '0.6rem', fontWeight: 600 }}>
+                      🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottles remaining — bottom center */}
+              {lottery?.wineCount != null && winners.length < lottery.wineCount && !animating && (
+                <div style={{
+                  position: 'absolute', bottom: '2rem', left: 0, right: 0,
+                  textAlign: 'center', pointerEvents: 'none',
+                  color: 'rgba(255,255,255,0.7)', fontSize: 'min(3vw, 3vh)',
+                }}>
+                  {winesLeftMessage(lottery.wineCount - winners.length)}
+                </div>
+              )}
+
+              {/* Winners list — bottom right */}
+              {winners.length > 0 && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute', bottom: '1.5rem', right: '1.5rem', zIndex: 10,
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+                    minWidth: 180, maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto',
+                    cursor: 'default',
+                  }}
+                >
+                  <div style={{
+                    padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 700,
+                  }}>
+                    🏆 Vinnere ({winners.length}{lottery?.wineCount ? `/${lottery.wineCount}` : ''})
+                  </div>
+                  {[...winners].reverse().map(w => (
+                    <div key={w.position} style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem',
+                      padding: '0.45rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    }}>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', minWidth: 20 }}>#{w.position}</span>
+                      <span style={{ fontWeight: 700, color: 'white', flex: 1, fontSize: '0.9rem' }}>{w.participantTag}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>#{w.ticketNumber}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -671,6 +790,9 @@ function PhotoUploadButton({ participantId, hasPhoto, uploading, onUpload }: {
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────
 
+const OVERLAY_Z = 2000
+const CONFETTI_Z = OVERLAY_Z + 1000
+
 const WHEEL_COLORS = [
   '#722F37', '#2d4a7a', '#2d7a5a', '#7a4a2d',
   '#5a2d7a', '#c5a028', '#7a2d6a', '#2d637a',
@@ -695,7 +817,7 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
   const ctx = canvas.getContext('2d')!
   const W = canvas.width, H = canvas.height
   const cx = W / 2, cy = H / 2
-  const r = Math.min(cx, cy) - 36
+  const r = Math.min(cx, cy) * 0.92
   ctx.clearRect(0, 0, W, H)
   const segs = getWheelSegments(buyerList)
   if (segs.length === 0) {
@@ -706,11 +828,11 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
     ctx.beginPath(); ctx.moveTo(cx, cy)
     ctx.arc(cx, cy, r, seg.start + angle, seg.end + angle)
     ctx.closePath(); ctx.fillStyle = seg.color; ctx.fill()
-    ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.strokeStyle = 'white'; ctx.lineWidth = Math.max(1, r * 0.008); ctx.stroke()
     const sweep = seg.end - seg.start
     if (sweep > 0.12) {
       const ma = seg.mid + angle
-      const fontSize = Math.max(10, Math.min(15, sweep * 14))
+      const fontSize = Math.max(r * 0.04, Math.min(r * 0.065, sweep * r * 0.06))
       ctx.save()
       ctx.translate(cx, cy)
       ctx.rotate(ma)
@@ -722,13 +844,15 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
     }
   }
   // Center circle
-  ctx.beginPath(); ctx.arc(cx, cy, 16, 0, 2 * Math.PI)
+  const cr = r * 0.07
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 2 * Math.PI)
   ctx.fillStyle = 'white'; ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke()
-  // Pointer triangle at top pointing down into wheel
+  // Pointer triangle at top, scaled with the wheel
+  const pw = r * 0.055, ph = r * 0.12
   ctx.beginPath()
   ctx.moveTo(cx, cy - r + 2)
-  ctx.lineTo(cx - 13, cy - r - 22); ctx.lineTo(cx + 13, cy - r - 22)
-  ctx.closePath(); ctx.fillStyle = '#C5A028'; ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke()
+  ctx.lineTo(cx - pw, cy - r - ph); ctx.lineTo(cx + pw, cy - r - ph)
+  ctx.closePath(); ctx.fillStyle = '#C5A028'; ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke()
 }
 
 interface WheelHandle {
@@ -807,7 +931,29 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
     }
   }), [buyers])
 
-  return <canvas ref={canvasRef} width={520} height={520} style={{ maxWidth: '100%', display: 'block' }} />
+  // Resize canvas to fill container
+  const lastSizeRef = useRef({ w: 0, h: 0 })
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const container = canvas.parentElement
+    if (!container) return
+    const observer = new ResizeObserver(() => {
+      const w = container.clientWidth, h = container.clientHeight
+      if (w === lastSizeRef.current.w && h === lastSizeRef.current.h) return
+      lastSizeRef.current = { w, h }
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+      canvas.style.width = `${w}px`
+      canvas.style.height = `${h}px`
+      if (!spinningRef.current) drawWheelFrame(canvas, angleRef.current, buyers)
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [buyers])
+
+  return <canvas ref={canvasRef} style={{ display: 'block' }} />
 })
 SpinningWheel.displayName = 'SpinningWheel'
 
@@ -941,8 +1087,8 @@ function fireConfetti() {
   const end = Date.now() + 3500
   const colors = ['#722F37', '#C5A028', '#ffffff', '#9b4a54']
   const frame = () => {
-    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors })
-    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors })
+    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors, zIndex: CONFETTI_Z })
+    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors, zIndex: CONFETTI_Z })
     if (Date.now() < end) requestAnimationFrame(frame)
   }
   frame()
