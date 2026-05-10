@@ -226,18 +226,17 @@ class LotteryService(
             val participated = lotteriesChronological.filter { (ticketCount[it.id]?.get(participant.id) ?: 0L) > 0 }
             if (participated.size < 2) return@forEach
 
-            var curWin = 0; var maxWin = 0
-            var curLose = 0; var maxLose = 0
+            var curWin = 0; var curLose = 0
             participated.forEach { lottery ->
                 if ((winCount[lottery.id]?.get(participant.id) ?: 0L) > 0) {
-                    curWin++; curLose = 0; if (curWin > maxWin) maxWin = curWin
+                    curWin++; curLose = 0
                 } else {
-                    curLose++; curWin = 0; if (curLose > maxLose) maxLose = curLose
+                    curLose++; curWin = 0
                 }
             }
             val streak = StreakDto(participant.id, participant.name, participant.tag, participant.photoData != null, 0, participated.size)
-            if (maxWin > (longestWinStreak?.streak ?: 0)) longestWinStreak = streak.copy(streak = maxWin)
-            if (maxLose > (longestLoseStreak?.streak ?: 0)) longestLoseStreak = streak.copy(streak = maxLose)
+            if (curWin > (longestWinStreak?.streak ?: 0)) longestWinStreak = streak.copy(streak = curWin)
+            if (curLose > (longestLoseStreak?.streak ?: 0)) longestLoseStreak = streak.copy(streak = curLose)
         }
 
         return AllTimeStatisticsDto(
