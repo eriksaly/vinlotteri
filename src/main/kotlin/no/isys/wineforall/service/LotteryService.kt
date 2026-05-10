@@ -94,6 +94,33 @@ class LotteryService(
     }
 
     @Transactional
+    fun updateBuyer(participantId: Long, newQuantity: Int): List<BuyerDto> {
+        require(newQuantity in 1..100) { "Antall lodd må være mellom 1 og 100" }
+        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        require(lottery.status == LotteryStatus.OPEN) { "Lotteriet er ikke åpent" }
+        val participant = participantRepo.findById(participantId).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        val existingTickets = ticketRepo.findAllByLotteryAndParticipant(lottery, participant)
+        val current = existingTickets.size
+
+        when {
+            newQuantity > current -> {
+                val nextNumber = ticketRepo.findMaxTicketNumberByLottery(lottery) + 1
+                val tickets = (nextNumber until nextNumber + (newQuantity - current)).map { num ->
+                    Ticket(ticketNumber = num, participant = participant, lottery = lottery)
+                }
+                ticketRepo.saveAll(tickets)
+            }
+            newQuantity < current -> {
+                val toRemove = existingTickets
+                    .sortedByDescending { it.ticketNumber }
+                    .take(current - newQuantity)
+                ticketRepo.deleteAllByIdInBatch(toRemove.map { it.id })
+            }
+        }
+        return getBuyers()
+    }
+
+    @Transactional
     fun removeBuyer(participantId: Long): List<BuyerDto> {
         val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
         require(lottery.status == LotteryStatus.OPEN) { "Kan ikke fjerne lodd etter trekning er startet" }
