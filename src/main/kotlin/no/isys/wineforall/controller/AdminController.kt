@@ -1,24 +1,43 @@
 package no.isys.wineforall.controller
 
 import no.isys.wineforall.dto.*
+import no.isys.wineforall.model.UserRole
+import no.isys.wineforall.repository.AppUserRepository
 import no.isys.wineforall.service.DrawingService
 import no.isys.wineforall.service.LotteryService
 import no.isys.wineforall.service.VinmonopoletService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
-import java.security.Principal
 
 @RestController
 @RequestMapping("/api/admin")
 class AdminController(
     private val lotteryService: LotteryService,
     private val drawingService: DrawingService,
-    private val vinmonopoletService: VinmonopoletService
+    private val vinmonopoletService: VinmonopoletService,
+    private val userRepository: AppUserRepository
 ) {
 
-    @GetMapping("/me")
-    fun me(principal: Principal) = mapOf("username" to principal.name)
+    // --- User management ---
+
+    @GetMapping("/users")
+    fun getUsers() = userRepository.findAll().map { u ->
+        UserDto(u.id, u.email, u.name, u.role, u.createdAt, u.lastLoginAt)
+    }
+
+    @PutMapping("/users/{id}/role")
+    fun updateUserRole(@PathVariable id: Long, @RequestBody req: UpdateRoleRequest): UserDto {
+        val user = userRepository.findById(id).orElseThrow { IllegalArgumentException("Bruker ikke funnet") }
+        user.role = req.role
+        val saved = userRepository.save(user)
+        return UserDto(saved.id, saved.email, saved.name, saved.role, saved.createdAt, saved.lastLoginAt)
+    }
+
+    @DeleteMapping("/users/{id}")
+    fun deleteUser(@PathVariable id: Long) {
+        userRepository.deleteById(id)
+    }
 
     // --- Participants ---
 

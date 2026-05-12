@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-primary { background: var(--wine); color: white; }
 .btn-primary:hover:not(:disabled) { background: var(--wine-dark); }
-.btn-gold { background: var(--gold); color: white; }
+.btn-gold { background: var(--gold); color: white; text-decoration: none; }
 .btn-gold:hover:not(:disabled) { background: var(--gold-light); }
 .btn-outline { background: transparent; color: var(--wine); border: 2px solid var(--wine); }
 .btn-outline:hover:not(:disabled) { background: var(--wine); color: white; }

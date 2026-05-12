@@ -1,7 +1,21 @@
 package no.isys.wineforall.dto
 
 import no.isys.wineforall.model.LotteryStatus
+import no.isys.wineforall.model.UserRole
 import java.time.Instant
+
+// --- User management ---
+
+data class UserDto(
+    val id: Long,
+    val email: String,
+    val name: String,
+    val role: UserRole,
+    val createdAt: Instant,
+    val lastLoginAt: Instant?
+)
+
+data class UpdateRoleRequest(val role: UserRole)
 
 // --- Requests ---
 

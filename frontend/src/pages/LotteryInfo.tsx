@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { LotteryInfo } from '../types'
+import NavBar from '../components/NavBar'
 
 export default function LotteryInfoPage() {
   const [lottery, setLottery] = useState<LotteryInfo | null>(null)
@@ -16,15 +17,7 @@ export default function LotteryInfoPage() {
 
   return (
     <div className="page">
-      <nav className="nav">
-        <div className="nav-inner">
-          <span className="nav-brand">🍷 Vinlotteri</span>
-          <div className="nav-links">
-            <Link to="/statistikk" className="nav-link">🏆 Hall of Vino</Link>
-            <Link to="/admin/login" className="nav-link">🗝️ Vinsjef</Link>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       <div className="page-header">
         <div className="container">

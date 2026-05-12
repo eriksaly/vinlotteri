@@ -423,9 +423,14 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
   const rafRef = useRef(0)
   const angleRef = useRef(Math.random() * Math.PI * 2)
   const spinningRef = useRef(false)
+  // Once a spin has happened, suppress external redraws until the next spin
+  // starts (which picks up the new buyers via snap = buyers.slice()).
+  const hasSpunRef = useRef(false)
 
   useEffect(() => {
-    if (!spinningRef.current) drawWheelFrame(canvasRef.current, angleRef.current, buyers)
+    if (!spinningRef.current && !hasSpunRef.current) {
+      drawWheelFrame(canvasRef.current, angleRef.current, buyers)
+    }
   }, [buyers])
 
   useImperativeHandle(ref, () => ({
@@ -433,6 +438,7 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
       return new Promise(resolve => {
         if (spinningRef.current) { resolve(); return }
         spinningRef.current = true
+        hasSpunRef.current = true
         cancelAnimationFrame(rafRef.current)
         const snap = buyers.slice()
         const startAngle = angleRef.current
@@ -503,7 +509,7 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
       canvas.height = h * dpr
       canvas.style.width = `${w}px`
       canvas.style.height = `${h}px`
-      if (!spinningRef.current) drawWheelFrame(canvas, angleRef.current, buyers)
+      if (!spinningRef.current && !hasSpunRef.current) drawWheelFrame(canvas, angleRef.current, buyers)
     })
     observer.observe(container)
     return () => observer.disconnect()

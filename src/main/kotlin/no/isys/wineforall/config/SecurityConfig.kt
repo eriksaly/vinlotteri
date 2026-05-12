@@ -3,18 +3,13 @@ package no.isys.wineforall.config
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import no.isys.wineforall.service.AppUserService
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
-import org.springframework.security.core.userdetails.User
-import org.springframework.security.core.userdetails.UserDetailsService
-import org.springframework.security.provisioning.InMemoryUserDetailsManager
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.authentication.AuthenticationFailureHandler
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler
-import org.springframework.security.web.authentication.logout.LogoutSuccessHandler
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.security.web.csrf.CsrfFilter
 import org.springframework.security.web.csrf.CsrfToken
@@ -27,8 +22,8 @@ import org.springframework.web.filter.OncePerRequestFilter
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    @Value("\${app.admin.username}") private val adminUsername: String,
-    @Value("\${app.admin.password}") private val adminPassword: String
+    private val appUserService: AppUserService,
+    @Value("\${app.allowed-origin:http://localhost:5173}") private val allowedOrigin: String
 ) {
 
     @Bean
@@ -39,75 +34,75 @@ class SecurityConfig(
                 csrf
                     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers("/api/admin/login")
+                    .ignoringRequestMatchers("/api/auth/logout")
             }
             .addFilterAfter(CsrfCookieFilter(), CsrfFilter::class.java)
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/admin/**").authenticated()
+                    .requestMatchers(
+                        "/oauth2/**",
+                        "/login/oauth2/**",
+                        "/login",
+                        "/ikke-verdig",
+                        "/error"
+                    ).permitAll()
+                    .requestMatchers("/api/auth/**").authenticated()
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()
             }
-            .formLogin { form ->
-                form
-                    .loginProcessingUrl("/api/admin/login")
-                    .successHandler(successHandler())
-                    .failureHandler(failureHandler())
-                    .permitAll()
+            .oauth2Login { oauth2 ->
+                oauth2
+                    .userInfoEndpoint { it.oidcUserService(appUserService) }
+                    .defaultSuccessUrl("$allowedOrigin/", true)
+                    .failureHandler { _, response, exception ->
+                        val isDomainError = (exception as? org.springframework.security.oauth2.core.OAuth2AuthenticationException)
+                            ?.error?.errorCode == "domain_not_allowed"
+                        val url = if (isDomainError) "$allowedOrigin/ikke-verdig" else "$allowedOrigin/login?error=auth"
+                        response.sendRedirect(url)
+                    }
             }
             .logout { logout ->
                 logout
-                    .logoutUrl("/api/admin/logout")
-                    .logoutSuccessHandler(logoutSuccessHandler())
+                    .logoutUrl("/api/auth/logout")
+                    .logoutSuccessHandler { _, response, _ ->
+                        response.status = 200
+                        response.contentType = "application/json;charset=UTF-8"
+                        response.writer.write("""{"success":true}""")
+                    }
                     .deleteCookies("JSESSIONID")
                     .permitAll()
             }
             .exceptionHandling { ex ->
-                ex.authenticationEntryPoint { _, response, _ ->
-                    response.status = 401
+                ex.authenticationEntryPoint { request, response, _ ->
+                    val acceptHeader = request.getHeader("Accept") ?: ""
+                    if (acceptHeader.contains("application/json") || request.requestURI.startsWith("/api/")) {
+                        response.status = 401
+                        response.contentType = "application/json;charset=UTF-8"
+                        response.writer.write("""{"error":"Ikke innlogget"}""")
+                    } else {
+                        response.sendRedirect("/oauth2/authorization/google")
+                    }
+                }
+                ex.accessDeniedHandler { _, response, _ ->
+                    response.status = 403
                     response.contentType = "application/json;charset=UTF-8"
-                    response.writer.write("""{"error":"Ikke innlogget"}""")
+                    response.writer.write("""{"error":"Ikke tilgang"}""")
                 }
             }
         return http.build()
     }
 
     @Bean
-    fun userDetailsService(): UserDetailsService {
-        val user = User.withUsername(adminUsername)
-            .password("{noop}$adminPassword")
-            .roles("ADMIN")
-            .build()
-        return InMemoryUserDetailsManager(user)
-    }
-
-    @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val config = CorsConfiguration()
-        config.allowedOrigins = listOf("http://localhost:5173")
+        config.allowedOrigins = listOf(allowedOrigin, "http://localhost:5173")
         config.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
         config.allowedHeaders = listOf("*")
         config.allowCredentials = true
         return UrlBasedCorsConfigurationSource().apply {
             registerCorsConfiguration("/**", config)
         }
-    }
-
-    private fun successHandler() = AuthenticationSuccessHandler { _, response, _ ->
-        response.status = 200
-        response.contentType = "application/json;charset=UTF-8"
-        response.writer.write("""{"success":true,"username":"$adminUsername"}""")
-    }
-
-    private fun failureHandler() = AuthenticationFailureHandler { _, response, _ ->
-        response.status = 401
-        response.contentType = "application/json;charset=UTF-8"
-        response.writer.write("""{"success":false,"error":"Feil brukernavn eller passord"}""")
-    }
-
-    private fun logoutSuccessHandler() = LogoutSuccessHandler { _, response, _ ->
-        response.status = 200
-        response.contentType = "application/json;charset=UTF-8"
-        response.writer.write("""{"success":true}""")
     }
 }
 

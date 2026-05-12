@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { AllTimeStatistics, LotteryStatistics, Streak } from '../types'
+import NavBar from '../components/NavBar'
 
 export default function StatisticsPage() {
   const [stats, setStats] = useState<AllTimeStatistics | null>(null)
   const [lotteries, setLotteries] = useState<LotteryStatistics[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedLottery, setExpandedLottery] = useState<number | null>(null)
-
   useEffect(() => {
     api.get<AllTimeStatistics>('/api/statistics')
       .then(r => setStats(r.data))
@@ -24,15 +24,7 @@ export default function StatisticsPage() {
 
   return (
     <div className="page">
-      <nav className="nav">
-        <div className="nav-inner">
-          <span className="nav-brand">🍷 Vinlotteri</span>
-          <div className="nav-links">
-            <Link to="/" className="nav-link">Hjem</Link>
-            <Link to="/admin/login" className="nav-link">🗝️ Vinsjef</Link>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       <div className="page-header">
         <div className="container">
@@ -70,7 +62,7 @@ export default function StatisticsPage() {
                   <div style={{ overflowX: 'auto' }}>
                     <table className="table">
                       <thead>
-                        <tr><th>#</th><th>Tag</th><th>Lodd</th></tr>
+                        <tr><th>#</th><th>Navn</th><th>Lodd</th></tr>
                       </thead>
                       <tbody>
                         {lotteries[0].winners.map(w => {
@@ -112,7 +104,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Tag</th><th>Vinnersjanser brukt</th></tr>
+                          <tr><th>#</th><th>Navn</th><th>Vinnersjanser brukt</th></tr>
                         </thead>
                         <tbody>
                           {stats.topLucky.map((p, i) => (
@@ -122,7 +114,7 @@ export default function StatisticsPage() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                   <MiniAvatar participant={p} />
                                   <div>
-                                    <span style={{ fontWeight: 600 }}>{p.tag}</span>
+                                    <span style={{ fontWeight: 600 }}>{p.name}</span>
                                     {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Gjeldende vinkjær</div>}
                                   </div>
                                 </div>
@@ -152,7 +144,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Tag</th><th>Livets urettferdighet</th></tr>
+                          <tr><th>#</th><th>Navn</th><th>Livets urettferdighet</th></tr>
                         </thead>
                         <tbody>
                           {stats.topUnlucky.map((p, i) => (
@@ -163,7 +155,7 @@ export default function StatisticsPage() {
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                   <MiniAvatar participant={p} />
-                                  <span style={{ fontWeight: 600 }}>{p.tag}</span>
+                                  <span style={{ fontWeight: 600 }}>{p.name}</span>
                                 </div>
                               </td>
                               <td>
@@ -192,7 +184,7 @@ export default function StatisticsPage() {
                 <div style={{ overflowX: 'auto' }}>
                   <table className="table">
                     <thead>
-                      <tr><th>#</th><th>Tag</th><th>Lodd kjøpt</th><th>Viner vunnet</th><th>Deltatt i</th></tr>
+                      <tr><th>#</th><th>Navn</th><th>Lodd kjøpt</th><th>Viner vunnet</th><th>Deltatt i</th></tr>
                     </thead>
                     <tbody>
                       {stats.topTicketBuyers.map((p, i) => (
@@ -201,7 +193,7 @@ export default function StatisticsPage() {
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                               <MiniAvatar participant={p} />
-                              <span style={{ fontWeight: 600 }}>{p.tag}</span>
+                              <span style={{ fontWeight: 600 }}>{p.name}</span>
                             </div>
                           </td>
                           <td style={{ fontWeight: 700 }}>
@@ -314,7 +306,7 @@ export default function StatisticsPage() {
                                       <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                           <MiniAvatar participant={p} />
-                                          <span style={{ fontWeight: 600 }}>{p.tag}</span>
+                                          <span style={{ fontWeight: 600 }}>{p.name}</span>
                                         </div>
                                       </td>
                                       <td style={{ fontWeight: 700 }}>{p.ticketsBought}</td>
@@ -366,7 +358,7 @@ function StreakCard({ streak, type }: { streak: Streak; type: 'win' | 'lose' }) 
       <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <MiniAvatar participant={streak} size="lg" />
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{streak.tag}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{streak.name}</div>
           <div style={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '0.1em' }}>
             {isWin
               ? Array(streak.streak).fill('🍷').join('')

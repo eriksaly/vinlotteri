@@ -1,3 +1,18 @@
+export interface AppUser {
+  email: string
+  name: string
+  role: 'ADMIN' | 'USER'
+}
+
+export interface UserDto {
+  id: number
+  email: string
+  name: string
+  role: 'ADMIN' | 'USER'
+  createdAt: string
+  lastLoginAt: string | null
+}
+
 export interface Participant {
   id: number
   name: string
