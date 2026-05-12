@@ -3,6 +3,7 @@ package no.isys.wineforall.controller
 import no.isys.wineforall.dto.*
 import no.isys.wineforall.service.DrawingService
 import no.isys.wineforall.service.LotteryService
+import no.isys.wineforall.service.VinmonopoletService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -12,7 +13,8 @@ import java.security.Principal
 @RequestMapping("/api/admin")
 class AdminController(
     private val lotteryService: LotteryService,
-    private val drawingService: DrawingService
+    private val drawingService: DrawingService,
+    private val vinmonopoletService: VinmonopoletService
 ) {
 
     @GetMapping("/me")
@@ -88,4 +90,13 @@ class AdminController(
 
     @GetMapping("/winners")
     fun getWinners(): List<WinnerDto> = drawingService.getCurrentWinners()
+
+    // --- Shopping suggestions ---
+
+    @GetMapping("/shopping/suggestions")
+    fun getShoppingSuggestions(
+        @RequestParam(defaultValue = "12") prizeCount: Int,
+        @RequestParam(required = false) budgetPerLottery: Int?,
+        @RequestParam(defaultValue = "1") lotteryCount: Int
+    ): ShoppingSuggestionsDto = vinmonopoletService.getSuggestions(prizeCount, budgetPerLottery, lotteryCount)
 }

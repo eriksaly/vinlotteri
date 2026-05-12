@@ -128,3 +128,18 @@ data class AllTimeStatisticsDto(
     val longestWinStreak: StreakDto?,
     val longestLoseStreak: StreakDto?
 )
+
+// --- Vinmonopolet shopping ---
+
+data class VinmonopoletProductDto(
+    val code: String,
+    val name: String,
+    val price: Double?,
+    val url: String,
+    val category: String
+)
+
+data class ShoppingSuggestionsDto(
+    val products: List<VinmonopoletProductDto>,
+    val prizeCount: Int
+)

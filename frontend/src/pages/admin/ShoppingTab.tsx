@@ -1,0 +1,184 @@
+import { useState } from 'react'
+import api from '../../api/client'
+import type { VinmonopoletProduct, ShoppingSuggestions } from '../../types'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  'Rødvin': '🍷 Rødvin',
+  'Musserende vin': '🥂 Musserende vin',
+  'Hvitvin': '🫧 Hvitvin',
+  'Rosévin': '🌸 Rosévin',
+  'Øl': '🍺 Øl',
+  'Gin': '🌿 Gin',
+  'Whisky': '🥃 Whisky',
+  'Likør': '🍹 Likør',
+  'Druebrennevin': '🍇 Druebrennevin',
+  'Akevitt': '🇳🇴 Akevitt',
+  'Brennevin': '🥃 Brennevin',
+}
+
+const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS)
+
+export default function ShoppingTab() {
+  const [prizeCount, setPrizeCount] = useState<number | ''>(12)
+  const [totalBudget, setTotalBudget] = useState<number | ''>('')
+  const [lotteryCount, setLotteryCount] = useState<number | ''>(1)
+  const [suggestions, setSuggestions] = useState<VinmonopoletProduct[] | null>(null)
+  const [fetchingProducts, setFetchingProducts] = useState(false)
+
+  const budgetPerLottery = totalBudget !== '' && lotteryCount !== '' && lotteryCount > 0
+    ? Math.floor(Number(totalBudget) / Number(lotteryCount))
+    : null
+
+  const totalCost = suggestions
+    ? suggestions.reduce((sum, p) => sum + (p.price ?? 0), 0)
+    : null
+
+  const totalBudgetNum = totalBudget !== '' ? Number(totalBudget) : null
+  const overBudget = totalBudgetNum != null && totalCost != null && totalCost > totalBudgetNum
+
+  const fetchSuggestions = async () => {
+    setFetchingProducts(true)
+    setSuggestions(null)
+    try {
+      const params = new URLSearchParams({ prizeCount: String(prizeCount || 12), lotteryCount: String(lotteryCount || 1) })
+      if (budgetPerLottery != null) params.set('budgetPerLottery', String(budgetPerLottery))
+      const r = await api.get<ShoppingSuggestions>(`/api/admin/shopping/suggestions?${params}`)
+      setSuggestions(r.data.products)
+    } catch (e: unknown) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved henting av produkter')
+    } finally {
+      setFetchingProducts(false)
+    }
+  }
+
+  const openAllTabs = () => {
+    suggestions?.forEach(p => window.open(p.url, '_blank', 'noopener,noreferrer'))
+  }
+
+  const byCategory = suggestions
+    ? [...CATEGORY_ORDER, ...suggestions.map(p => p.category).filter(c => !CATEGORY_ORDER.includes(c))]
+        .reduce<Record<string, VinmonopoletProduct[]>>((acc, cat) => {
+          const items = suggestions.filter(p => p.category === cat)
+          if (items.length > 0) acc[cat] = items
+          return acc
+        }, {})
+    : {}
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div className="card">
+        <div className="card-header">Fyll handekurv hos Vinmonopolet</div>
+        <div className="card-body">
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Totalbudsjett (kr)</label>
+              <input
+                className="form-control"
+                type="number"
+                min={0}
+                value={totalBudget}
+                onChange={e => setTotalBudget(e.target.value === '' ? '' : Number(e.target.value))}
+                style={{ width: 110 }}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Antall trekniger</label>
+              <input
+                className="form-control"
+                type="number"
+                min={1}
+                max={20}
+                value={lotteryCount}
+                onChange={e => setLotteryCount(e.target.value === '' ? '' : Number(e.target.value))}
+                onBlur={e => { const n = parseInt(e.target.value); setLotteryCount(isNaN(n) ? 1 : Math.max(1, n)) }}
+                style={{ width: 80 }}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Premier per trekning</label>
+              <input
+                className="form-control"
+                type="number"
+                min={5}
+                max={50}
+                value={prizeCount}
+                onChange={e => setPrizeCount(e.target.value === '' ? '' : Number(e.target.value))}
+                onBlur={e => { const n = parseInt(e.target.value); setPrizeCount(isNaN(n) ? 12 : Math.max(5, n)) }}
+                style={{ width: 90 }}
+              />
+            </div>
+            <button className="btn btn-primary" onClick={fetchSuggestions} disabled={fetchingProducts}>
+              {fetchingProducts ? '⏳ Henter produkter...' : '🔍 Finn produkter'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {budgetPerLottery != null && (
+              <span>💰 <strong>{budgetPerLottery} kr</strong> per trekning</span>
+            )}
+            <span>Kun på lager i Horten Sjøsiden · fordeling varierer</span>
+          </div>
+        </div>
+      </div>
+
+      {suggestions && (
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <span>Foreslåtte produkter ({suggestions.length} flasker)</span>
+              {totalCost != null && (
+                <span style={{ fontWeight: 700, color: overBudget ? '#b91c1c' : 'var(--text)', fontSize: '0.9rem' }}>
+                  {overBudget ? '⚠️' : '✓'} {totalCost.toFixed(0)} kr
+                  {totalBudgetNum != null && (
+                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                      / {totalBudgetNum} kr budsjett
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+              {suggestions.length > 0 && (
+                <button className="btn btn-primary btn-sm" onClick={openAllTabs}>
+                  🛒 Åpne alle i nye faner
+                </button>
+              )}
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Hvis kun én fane åpnes: tillat pop-ups for dette nettstedet i nettleseren
+              </span>
+            </div>
+          </div>
+
+          <div className="card-body" style={{ padding: '1rem' }}>
+            {Object.entries(byCategory).map(([cat, products]) => (
+              <div key={cat} style={{ marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                  {CATEGORY_LABELS[cat] ?? cat}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  {products.map(p => (
+                    <div key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem' }}>
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--wine)', textDecoration: 'none', fontWeight: 500 }}
+                      >
+                        {p.name}
+                      </a>
+                      {p.price != null && (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                          {p.price.toFixed(2)} kr
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

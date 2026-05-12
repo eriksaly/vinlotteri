@@ -90,3 +90,16 @@ export interface DrawResult {
   winner: Winner
   remainingTickets: number
 }
+
+export interface VinmonopoletProduct {
+  code: string
+  name: string
+  price: number | null
+  url: string
+  category: string
+}
+
+export interface ShoppingSuggestions {
+  products: VinmonopoletProduct[]
+  prizeCount: number
+}
