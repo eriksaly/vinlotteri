@@ -39,6 +39,25 @@ export interface LotteryInfo {
   createdAt: string
 }
 
+export interface InventoryItem {
+  id: number
+  vinmonopoletCode: string
+  name: string
+  price: number
+  category: string
+  quantity: number
+  country: string
+  imageUrl: string
+  createdAt: string
+}
+
+export interface LotteryPrize {
+  id: number
+  position: number
+  items: InventoryItem[]
+  winnerId: number | null
+}
+
 export interface Winner {
   position: number
   ticketNumber: number
@@ -46,6 +65,7 @@ export interface Winner {
   participantName: string
   participantTag: string
   drawnAt: string
+  prize?: LotteryPrize | null
 }
 
 export interface AllTimeParticipantStats {
@@ -104,6 +124,7 @@ export interface AllTimeStatistics {
 export interface DrawResult {
   winner: Winner
   remainingTickets: number
+  prize?: LotteryPrize | null
 }
 
 export interface VinmonopoletProduct {
@@ -112,6 +133,7 @@ export interface VinmonopoletProduct {
   price: number | null
   url: string
   category: string
+  country: string
 }
 
 export interface ShoppingSuggestions {

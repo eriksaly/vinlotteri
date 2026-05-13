@@ -12,6 +12,7 @@ export default function ParticipantsTab() {
   const [editName, setEditName] = useState('')
   const [editTag, setEditTag] = useState('')
   const [uploadingId, setUploadingId] = useState<number | null>(null)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => api.get<Participant[]>('/api/admin/participants').then(r => setParticipants(r.data)), [])
   useEffect(() => { load() }, [load])
@@ -67,11 +68,11 @@ export default function ParticipantsTab() {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
               <label>Fullt navn</label>
-              <input className="form-control" value={name} onChange={e => setName(e.target.value)} placeholder="Ola Nordmann" />
+              <input className="form-control" value={name} onChange={e => setName(e.target.value)} placeholder="Ola Nordmann" onKeyDown={e => { if (e.key === 'Tab') { e.preventDefault(); tagInputRef.current?.focus() } }} />
             </div>
             <div className="form-group" style={{ flex: '0 0 120px', marginBottom: 0 }}>
               <label>Tag (forkortelse)</label>
-              <input className="form-control" value={tag} onChange={e => setTag(e.target.value.toUpperCase())} placeholder="ON" maxLength={3} />
+              <input ref={tagInputRef} className="form-control" value={tag} onChange={e => setTag(e.target.value.toUpperCase())} placeholder="ON" maxLength={3} onKeyDown={e => { if (e.key === 'Enter' && name.trim() && tag.trim()) create() }} />
             </div>
             <button className="btn btn-primary" onClick={create} disabled={!name.trim() || !tag.trim()}>
               Opprett

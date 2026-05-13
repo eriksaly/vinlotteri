@@ -1,5 +1,6 @@
 package no.isys.wineforall.service
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import no.isys.wineforall.dto.ShoppingSuggestionsDto
 import no.isys.wineforall.dto.VinmonopoletProductDto
 import tools.jackson.databind.DeserializationFeature
@@ -24,19 +25,6 @@ class VinmonopoletService {
         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .build()
 
-    // Distribution variants for the 3 "fancy wine" prize slots (sparkling + white + rosé).
-    // Each tuple (sparkling, white, rosé) must sum to 3 so prizeCount stays consistent.
-    private data class WineVariant(val sparkling: Int, val white: Int, val rose: Int)
-    private val wineVariants = listOf(
-        WineVariant(1, 1, 1), // classic — weighted 2× for balance
-        WineVariant(1, 1, 1),
-        WineVariant(2, 1, 0), // 2 sparkling, 1 white
-        WineVariant(2, 0, 1), // 2 sparkling, 1 rosé
-        WineVariant(0, 2, 1), // 2 white, 1 rosé
-        WineVariant(1, 2, 0), // 1 sparkling, 2 white
-        WineVariant(0, 1, 2), // 2 rosé, 1 white
-        WineVariant(1, 0, 2), // 1 sparkling, 2 rosé
-    )
 
     // Spirits weights: Likør 50% · Whisky 20% · Gin 20% · Akevitt 10%
     private val spiritsVariants = listOf(
@@ -119,20 +107,19 @@ class VinmonopoletService {
         // Each lottery independently picks its own wine variant and spirits category.
         // Keep raw picks so we can do budget adjustment before converting to DTOs.
         val picked = (1..lotteryCount).mapIndexed { i, _ ->
-            val v = wineVariants.random()
             val (spiritsSubcat, spiritsLabel) = spiritsAssignments[i]
-            log.info("Lottery: sparkling={} white={} rose={} spirits={}", v.sparkling, v.white, v.rose, spiritsLabel)
+            log.info("Lottery: sparkling=1 white=1 rose=1 spirits={}", spiritsLabel)
             // Whisky: enforce minimum 350 kr floor to avoid cheap supermarket-tier bottles
             val whiskyMinFloor = if (spiritsSubcat == "brennevin_whisky") 350 else null
             val spiritsPool = spiritsPoolCache.getOrPut(spiritsSubcat) {
                 fetchPool("brennevin", ranges?.spirits, spiritsSubcat, minFloor = whiskyMinFloor)
             }
-            pickRaw(redPool,     nReds,       "Rødvin",         usedCodes) +
-            pickRaw(sparkPool,   v.sparkling, "Musserende vin", usedCodes) +
-            pickRaw(whitePool,   v.white,     "Hvitvin",        usedCodes) +
-            pickRaw(rosePool,    v.rose,      "Rosévin",        usedCodes) +
-            pickRaw(beerPool,    3,           "Øl",             usedCodes) +
-            pickRaw(spiritsPool, 1,           spiritsLabel,     usedCodes)
+            pickRaw(redPool,     nReds, "Rødvin",         usedCodes) +
+            pickRaw(sparkPool,   1,     "Musserende vin", usedCodes) +
+            pickRaw(whitePool,   1,     "Hvitvin",        usedCodes) +
+            pickRaw(rosePool,    1,     "Rosévin",        usedCodes) +
+            pickBeersByCountry(beerPool,                   usedCodes) +
+            pickRaw(spiritsPool, 1,     spiritsLabel,     usedCodes)
         }.flatten().toMutableList()
 
         // Budget trim: if total cost exceeds budget, swap out reds for slightly cheaper
@@ -173,7 +160,8 @@ class VinmonopoletService {
                 name = raw.name ?: "",
                 price = raw.price?.value,
                 url = "https://www.vinmonopolet.no${raw.url ?: "/p/${raw.code}"}",
-                category = category
+                category = category,
+                country = raw.mainCountry?.name ?: ""
             )
         }
 
@@ -198,6 +186,22 @@ class VinmonopoletService {
     }
 
     private data class PickedProduct(val raw: ProductRaw, val category: String)
+
+    // Picks 3 beers from the same country. Prefers countries with ≥ 3 unused beers.
+    // Falls back to any 3 beers if no country has enough.
+    private fun pickBeersByCountry(pool: List<ProductRaw>, usedCodes: MutableSet<String>): List<PickedProduct> {
+        val fresh = pool.filter { (it.code ?: "") !in usedCodes }
+        val byCountry = fresh.groupBy { it.mainCountry?.name?.takeIf { c -> c.isNotBlank() } ?: "Ukjent" }
+        val validCountries = byCountry.filter { it.value.size >= 3 }.keys.toList()
+        val beers = if (validCountries.isNotEmpty()) {
+            byCountry[validCountries.random()]!!.shuffled().take(3)
+        } else {
+            // No country has 3 fresh beers — fall back to any available
+            fresh.shuffled().take(3).ifEmpty { pool.shuffled().take(3) }
+        }
+        beers.forEach { usedCodes.add(it.code ?: "") }
+        return beers.map { PickedProduct(it, "Øl") }
+    }
 
     // Picks count random products from pool, avoiding already-used codes where possible.
     // Falls back to used products if the pool doesn't have enough unique ones.
@@ -277,8 +281,46 @@ class VinmonopoletService {
         val spirits: Double
     )
 
+    fun lookupProduct(code: String): VinmonopoletProductDto? {
+        val trimmed = code.trim()
+        val encodedQ = URLEncoder.encode(trimmed, StandardCharsets.UTF_8)
+        val url = "$baseUrl/products/search?fields=FULL&pageSize=5&currentPage=0&q=$encodedQ&latitude=$storeLat&longitude=$storeLon"
+        return try {
+            val raw = client.get()
+                .uri(URI.create(url))
+                .header("Accept", "application/json")
+                .retrieve()
+                .body(String::class.java) ?: return null
+            val parsed = objectMapper.readValue(raw, SearchResponse::class.java)
+            val product = (parsed.products ?: emptyList()).firstOrNull { it.code == trimmed }
+                ?: parsed.products?.firstOrNull()
+                ?: return null
+            VinmonopoletProductDto(
+                code = product.code ?: return null,
+                name = product.name ?: return null,
+                price = product.price?.value,
+                url = "https://www.vinmonopolet.no${product.url ?: "/p/${product.code}"}",
+                category = product.mainSubCategory?.name ?: product.mainCategory?.name ?: "",
+                country = product.mainCountry?.name ?: ""
+            )
+        } catch (e: Exception) {
+            log.warn("Product lookup failed for code={}: {}", trimmed, e.message)
+            null
+        }
+    }
+
     data class SearchResponse(val products: List<ProductRaw>? = null)
-    data class ProductRaw(val code: String? = null, val name: String? = null, val url: String? = null, val price: PriceRaw? = null, val stock: StockRaw? = null)
+    data class ProductRaw(
+        val code: String? = null,
+        val name: String? = null,
+        val url: String? = null,
+        val price: PriceRaw? = null,
+        val stock: StockRaw? = null,
+        @JsonProperty("main_category") val mainCategory: CategoryRaw? = null,
+        @JsonProperty("main_sub_category") val mainSubCategory: CategoryRaw? = null,
+        @JsonProperty("main_country") val mainCountry: CategoryRaw? = null
+    )
+    data class CategoryRaw(val name: String? = null, val code: String? = null)
     data class PriceRaw(val value: Double? = null)
     // stock reflects the nearest store (determined by lat/lon); stockLevelStatus "outOfStock" = not in Horten
     data class StockRaw(val stockLevel: Int? = null, val stockLevelStatus: String? = null)

@@ -4,7 +4,9 @@ import no.isys.wineforall.dto.*
 import no.isys.wineforall.model.UserRole
 import no.isys.wineforall.repository.AppUserRepository
 import no.isys.wineforall.service.DrawingService
+import no.isys.wineforall.service.InventoryService
 import no.isys.wineforall.service.LotteryService
+import no.isys.wineforall.service.PrizeService
 import no.isys.wineforall.service.VinmonopoletService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -16,6 +18,8 @@ class AdminController(
     private val lotteryService: LotteryService,
     private val drawingService: DrawingService,
     private val vinmonopoletService: VinmonopoletService,
+    private val inventoryService: InventoryService,
+    private val prizeService: PrizeService,
     private val userRepository: AppUserRepository
 ) {
 
@@ -118,4 +122,53 @@ class AdminController(
         @RequestParam(required = false) budgetPerLottery: Int?,
         @RequestParam(defaultValue = "1") lotteryCount: Int
     ): ShoppingSuggestionsDto = vinmonopoletService.getSuggestions(prizeCount, budgetPerLottery, lotteryCount)
+
+    // --- Vinmonopolet product lookup ---
+
+    @GetMapping("/inventory/lookup")
+    fun lookupProduct(@RequestParam code: String): ResponseEntity<VinmonopoletProductDto> {
+        val product = vinmonopoletService.lookupProduct(code)
+            ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(product)
+    }
+
+    // --- Inventory ---
+
+    @GetMapping("/inventory")
+    fun getInventory(): List<InventoryItemDto> = inventoryService.getAll()
+
+    @PostMapping("/inventory")
+    fun addInventoryItem(@RequestBody req: CreateInventoryItemRequest): InventoryItemDto =
+        inventoryService.create(req)
+
+    @PostMapping("/inventory/bulk")
+    fun bulkAddInventoryItems(@RequestBody req: BulkAddInventoryRequest): List<InventoryItemDto> =
+        inventoryService.bulkCreate(req)
+
+    @PutMapping("/inventory/{id}")
+    fun updateInventoryItem(
+        @PathVariable id: Long,
+        @RequestBody req: UpdateInventoryItemRequest
+    ): InventoryItemDto = inventoryService.update(id, req)
+
+    @DeleteMapping("/inventory/{id}")
+    fun deleteInventoryItem(@PathVariable id: Long): ResponseEntity<Void> {
+        inventoryService.delete(id)
+        return ResponseEntity.noContent().build()
+    }
+
+    // --- Prizes ---
+
+    @GetMapping("/lottery/current/prizes")
+    fun getCurrentPrizes(): List<LotteryPrizeDto> = prizeService.getPrizesForCurrentLottery()
+
+    @PostMapping("/lottery/current/prizes")
+    fun setPrizeSlots(@RequestBody req: SetPrizeSlotsRequest): List<LotteryPrizeDto> =
+        prizeService.setPrizeSlots(req.count)
+
+    @PutMapping("/lottery/current/prizes/{position}")
+    fun assignPrizeItems(
+        @PathVariable position: Int,
+        @RequestBody req: AssignPrizeItemsRequest
+    ): LotteryPrizeDto = prizeService.assignItems(position, req)
 }

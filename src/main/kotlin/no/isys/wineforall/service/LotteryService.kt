@@ -13,6 +13,7 @@ class LotteryService(
     private val participantRepo: ParticipantRepository,
     private val ticketRepo: TicketRepository,
     private val winnerRepo: WinnerRepository,
+    private val prizeRepo: LotteryPrizeRepository,
     @Value("\${app.vipps-number}") private val vippsNumber: String,
     @Value("\${app.price-per-ticket:5}") private val pricePerTicket: Int
 ) {
@@ -39,11 +40,14 @@ class LotteryService(
 
     @Transactional
     fun startDrawing(wineCount: Int): LotteryInfoDto {
-        require(wineCount in 1..100) { "Antall viner må være mellom 1 og 100" }
         val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
         require(lottery.status == LotteryStatus.OPEN) { "Lotteriet er ikke åpent" }
+        // If prize slots are already configured, use their count; otherwise use the request param
+        val prizeSlotCount = prizeRepo.countByLottery(lottery)
+        val effectiveCount = if (prizeSlotCount > 0) prizeSlotCount else wineCount
+        require(effectiveCount in 1..100) { "Antall viner må være mellom 1 og 100" }
         lottery.status = LotteryStatus.DRAWING
-        lottery.wineCount = wineCount
+        lottery.wineCount = effectiveCount
         return lotteryRepo.save(lottery).toInfoDto()
     }
 

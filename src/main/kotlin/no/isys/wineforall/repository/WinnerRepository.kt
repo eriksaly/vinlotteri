@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.Query
 
 interface WinnerRepository : JpaRepository<Winner, Long> {
     fun findAllByLotteryOrderByPosition(lottery: Lottery): List<Winner>
+
+    @Query("SELECT DISTINCT w FROM Winner w LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.items WHERE w.lottery = :lottery ORDER BY w.position")
+    fun findAllByLotteryWithPrizeOrderByPosition(lottery: Lottery): List<Winner>
     fun countByLotteryAndParticipant(lottery: Lottery, participant: Participant): Long
 
     @Query("SELECT w.participant, COUNT(w) as wins FROM Winner w WHERE w.lottery IN :lotteries GROUP BY w.participant")

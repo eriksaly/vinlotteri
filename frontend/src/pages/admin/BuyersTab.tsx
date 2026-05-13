@@ -110,6 +110,7 @@ export default function BuyersTab({ lottery, onLotteryChange }: { lottery: Lotte
                     const price = lottery?.pricePerTicket ?? 5
                     setQuantity(Math.max(1, Math.floor(kr / price)))
                   }}
+                  onKeyDown={e => { if (e.key === 'Enter' && selectedParticipantId) addBuyer() }}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>

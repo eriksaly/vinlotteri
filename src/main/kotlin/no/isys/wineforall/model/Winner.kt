@@ -25,5 +25,9 @@ class Winner(
     val position: Int,
 
     @Column(nullable = false)
-    val drawnAt: Instant = Instant.now()
+    val drawnAt: Instant = Instant.now(),
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "prize_id", nullable = true)
+    var prize: LotteryPrize? = null
 )

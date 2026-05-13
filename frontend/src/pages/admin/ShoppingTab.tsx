@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import api from '../../api/client'
 import type { VinmonopoletProduct, ShoppingSuggestions } from '../../types'
 
@@ -24,6 +24,14 @@ export default function ShoppingTab() {
   const [lotteryCount, setLotteryCount] = useState<number | ''>(1)
   const [suggestions, setSuggestions] = useState<VinmonopoletProduct[] | null>(null)
   const [fetchingProducts, setFetchingProducts] = useState(false)
+  const [addingToInventory, setAddingToInventory] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3500)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const budgetPerLottery = totalBudget !== '' && lotteryCount !== '' && lotteryCount > 0
     ? Math.floor(Number(totalBudget) / Number(lotteryCount))
@@ -45,7 +53,7 @@ export default function ShoppingTab() {
       const r = await api.get<ShoppingSuggestions>(`/api/admin/shopping/suggestions?${params}`)
       setSuggestions(r.data.products)
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved henting av produkter')
+      setToast({ msg: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved henting av produkter', ok: false })
     } finally {
       setFetchingProducts(false)
     }
@@ -53,6 +61,28 @@ export default function ShoppingTab() {
 
   const openAllTabs = () => {
     suggestions?.forEach(p => window.open(p.url, '_blank', 'noopener,noreferrer'))
+  }
+
+  const addAllToInventory = async () => {
+    if (!suggestions || suggestions.length === 0) return
+    setAddingToInventory(true)
+    try {
+      await api.post('/api/admin/inventory/bulk', {
+        items: suggestions.map(p => ({
+          vinmonopoletCode: p.code,
+          name: p.name,
+          price: p.price ?? 0,
+          category: p.category,
+          quantity: 1,
+          country: p.country
+        }))
+      })
+      setToast({ msg: `${suggestions.length} produkter lagt til i lageret!`, ok: true })
+    } catch (e: unknown) {
+      setToast({ msg: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved lagring', ok: false })
+    } finally {
+      setAddingToInventory(false)
+    }
   }
 
   const byCategory = suggestions
@@ -66,6 +96,15 @@ export default function ShoppingTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {toast && (
+        <div style={{
+          padding: '0.75rem 1.25rem', borderRadius: 8, fontWeight: 500, fontSize: '0.9rem',
+          background: toast.ok ? '#166534' : '#7f1d1d',
+          color: 'white', border: `1px solid ${toast.ok ? '#15803d' : '#991b1b'}`,
+        }}>
+          {toast.ok ? '✓' : '⚠️'} {toast.msg}
+        </div>
+      )}
       <div className="card">
         <div className="card-header">Fyll handekurv hos Vinmonopolet</div>
         <div className="card-body">
@@ -137,11 +176,17 @@ export default function ShoppingTab() {
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
               {suggestions.length > 0 && (
-                <button className="btn btn-primary btn-sm" onClick={openAllTabs}>
-                  🛒 Åpne alle i nye faner
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn btn-sm" onClick={addAllToInventory} disabled={addingToInventory}
+                    title="Legg alle foreslåtte produkter til lagerbeholdningen">
+                    {addingToInventory ? '⏳' : '🗄️'} Legg til i lager
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={openAllTabs}>
+                    🛒 Åpne alle i nye faner
+                  </button>
+                </div>
               )}
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                 Hvis kun én fane åpnes: tillat pop-ups for dette nettstedet i nettleseren

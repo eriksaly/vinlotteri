@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import confetti from 'canvas-confetti'
 import api from '../../api/client'
 import { playTick, playWin } from '../../audio'
-import type { Buyer, LotteryInfo, Winner, DrawResult } from '../../types'
+import type { Buyer, LotteryInfo, LotteryPrize, Winner, DrawResult } from '../../types'
 import { useConfirm } from './shared'
 
 const OVERLAY_Z = 2000
@@ -11,31 +11,42 @@ const CONFETTI_Z = OVERLAY_Z + 1000
 export default function DrawingTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; onLotteryChange: () => Promise<void> }) {
   const [winners, setWinners] = useState<Winner[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
-  const [animating, setAnimating] = useState(false)
+  const [prizes, setPrizes] = useState<LotteryPrize[]>([])
+  const [phase, setPhase] = useState<'idle' | 'spinning' | 'winner' | 'nextPrize'>('idle')
   const [latestWinner, setLatestWinner] = useState<Winner | null>(null)
   const [, setRemainingTickets] = useState<number>(0)
   const [wineCount, setWineCount] = useState(5)
   const [showStartForm, setShowStartForm] = useState(false)
   const [showWheel, setShowWheel] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const { confirm, dialog } = useConfirm()
   const wheelRef = useRef<WheelHandle>(null)
 
   useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  useEffect(() => {
     if (!showWheel) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !animating) setShowWheel(false)
+      if (e.key === 'Escape' && phase !== 'spinning') setShowWheel(false)
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showWheel, animating])
+  }, [showWheel, phase])
 
   const load = useCallback(async () => {
-    const [w, b] = await Promise.all([
+    const [w, b, p] = await Promise.all([
       api.get<Winner[]>('/api/admin/winners'),
       api.get<Buyer[]>('/api/admin/buyers'),
+      api.get<LotteryPrize[]>('/api/admin/lottery/current/prizes'),
     ])
     setWinners(w.data)
     setBuyers(b.data)
+    setPrizes(p.data)
+    setWineCount(p.data.length > 0 ? p.data.length : 5)
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -53,14 +64,14 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
       setShowStartForm(false)
       await onLotteryChange()
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
+      setToast((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
     }
   }
 
   const drawWinner = async () => {
-    if (animating) return
+    if (phase === 'spinning') return
     setShowWheel(true)
-    setAnimating(true)
+    setPhase('spinning')
     setLatestWinner(null)
 
     // Wait two frames for overlay to mount and ResizeObserver to fire
@@ -78,15 +89,19 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
       setLatestWinner(result.data.winner)
       setRemainingTickets(result.data.remainingTickets)
       setWinners(prev => [...prev, result.data.winner])
-      const b = await api.get<Buyer[]>('/api/admin/buyers')
+      const [b, p] = await Promise.all([
+        api.get<Buyer[]>('/api/admin/buyers'),
+        api.get<LotteryPrize[]>('/api/admin/lottery/current/prizes'),
+      ])
       setBuyers(b.data)
-      setAnimating(false)
+      setPrizes(p.data)
+      setPhase('winner')
       fireConfetti()
     } catch (e: unknown) {
       rejectWinner(e)
-      setAnimating(false)
+      setPhase('idle')
       setShowWheel(false)
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved trekning')
+      setToast((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved trekning')
     }
   }
 
@@ -96,7 +111,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
       await api.post('/api/admin/lottery/finish')
       await onLotteryChange()
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
+      setToast((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
     }
   }
 
@@ -104,9 +119,19 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
   const isDrawing = lottery?.status === 'DRAWING'
   const totalTickets = buyers.reduce((s, b) => s + b.ticketCount, 0)
   const allDrawn = winners.length >= (lottery?.wineCount ?? 999)
+  const nextPrizePosition = winners.length + 1
+  const nextPrize = prizes.find(p => p.position === nextPrizePosition) ?? null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {toast && (
+        <div style={{
+          padding: '0.75rem 1.25rem', borderRadius: 8, fontWeight: 500, fontSize: '0.9rem',
+          background: '#7f1d1d', color: 'white', border: '1px solid #991b1b',
+        }}>
+          ⚠️ {toast}
+        </div>
+      )}
       {isOpen && (
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center', padding: '2rem' }}>
@@ -152,7 +177,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                   {!showWheel && <SpinningWheel ref={wheelRef} buyers={buyers} />}
                 </div>
 
-                {latestWinner && !animating && (
+                {latestWinner && phase === 'idle' && (
                   <div style={{ color: 'white', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>🏆 {latestWinner.participantTag}</div>
                     <div style={{ color: '#c5c5c5', fontSize: '0.7rem', marginTop: '0.2rem' }}>
@@ -164,15 +189,47 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                   </div>
                 )}
 
+                {nextPrize && !allDrawn && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '1rem',
+                    background: 'rgba(255,255,255,0.08)', borderRadius: 12,
+                    padding: '0.75rem 1.25rem', border: '1px solid rgba(255,255,255,0.15)',
+                  }}>
+                    {nextPrize.items.length > 0 ? (
+                      <>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {nextPrize.items.map(item => (
+                            <img key={item.id} src={item.imageUrl} alt={item.name}
+                              style={{ width: 56, height: 80, objectFit: 'contain', borderRadius: 6 }}
+                              onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                          ))}
+                        </div>
+                        <div style={{ color: 'white' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', marginBottom: '0.3rem' }}>
+                            Premie #{nextPrize.position}
+                          </div>
+                          {nextPrize.items.map(item => (
+                            <div key={item.id} style={{ fontSize: '0.88rem', fontWeight: 600, lineHeight: 1.4 }}>{item.name}</div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem' }}>
+                        Premie #{nextPrize.position} — flaske ikke tildelt
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
                   <button
                     className="btn btn-gold btn-xl"
                     onClick={drawWinner}
-                    disabled={animating || allDrawn}
+                    disabled={phase === 'spinning' || allDrawn}
                   >
-                    {animating ? '🎰 Skjebnen avgjøres...' : allDrawn ? '🏁 Kjelleren er tom!' : '🎰 Trekk vin'}
+                    {phase === 'spinning' ? '🎰 Skjebnen avgjøres...' : allDrawn ? '🏁 Kjelleren er tom!' : '🎰 Trekk vin'}
                   </button>
-                  {lottery?.wineCount != null && winners.length < lottery.wineCount && !animating && (
+                  {lottery?.wineCount != null && winners.length < lottery.wineCount && phase !== 'spinning' && (
                     <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem' }}>
                       {winesLeftMessage(lottery.wineCount - winners.length)}
                     </span>
@@ -223,15 +280,19 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
           {/* Full-screen wheel overlay */}
           {showWheel && (
             <div
-              onClick={() => { if (!animating && winners.length < (lottery?.wineCount ?? 999)) drawWinner() }}
+              onClick={() => {
+                if (phase === 'spinning') return
+                if (phase === 'winner') { if (!allDrawn) setPhase('nextPrize'); else setShowWheel(false) }
+                else if (phase === 'nextPrize') drawWinner()
+              }}
               style={{
                 position: 'fixed', inset: 0, zIndex: OVERLAY_Z,
                 background: 'linear-gradient(135deg, #1a0a0d 0%, #2a1215 30%, #1a0a0d 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: animating || allDrawn ? 'default' : 'pointer',
+                cursor: phase === 'spinning' ? 'default' : 'pointer',
               }}>
               {/* Close button */}
-              {!animating && (
+              {phase !== 'spinning' && (
                 <button
                   onClick={e => { e.stopPropagation(); setShowWheel(false) }}
                   style={{
@@ -243,22 +304,83 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                 >✕</button>
               )}
 
-              {/* Wheel */}
-              <div style={{
-                width: '100vw', height: '100vh',
-                position: 'relative',
-                opacity: latestWinner && !animating ? 0.3 : 1,
-                transition: 'opacity 0.5s',
-              }}>
-                <SpinningWheel ref={wheelRef} buyers={buyers} />
-              </div>
-
-              {/* Winner announcement */}
-              {latestWinner && !animating && (
+              {/* ── spinning + winner phases: show wheel ── */}
+              {(phase === 'spinning' || phase === 'winner') && (<>
                 <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  pointerEvents: 'none',
+                  width: '100vw', height: '100vh', position: 'relative',
+                  opacity: phase === 'winner' ? 0.15 : 1,
+                  transition: 'opacity 0.6s',
+                }}>
+                  <SpinningWheel ref={wheelRef} buyers={buyers} />
+                </div>
+
+                {/* Bottles remaining */}
+                {lottery?.wineCount != null && winners.length < lottery.wineCount && phase === 'spinning' && (
+                  <div style={{ position: 'absolute', bottom: '2rem', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 'min(3vw, 3vh)' }}>
+                    {winesLeftMessage(lottery.wineCount - winners.length)}
+                  </div>
+                )}
+
+                {/* Winners list (during spin only) */}
+                {winners.length > 0 && phase === 'spinning' && (
+                  <div onClick={e => e.stopPropagation()} style={{
+                    position: 'absolute', bottom: '1.5rem', right: '1.5rem', zIndex: 10,
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+                    minWidth: 180, maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto', cursor: 'default',
+                  }}>
+                    <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 700 }}>
+                      🏆 Vinnere ({winners.length}{lottery?.wineCount ? `/${lottery.wineCount}` : ''})
+                    </div>
+                    {[...winners].reverse().map(w => (
+                      <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', minWidth: 20 }}>#{w.position}</span>
+                        <span style={{ fontWeight: 700, color: 'white', flex: 1, fontSize: '0.9rem' }}>{w.participantTag}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>#{w.ticketNumber}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>)}
+
+              {/* Prize card — left side during spin */}
+              {phase === 'spinning' && nextPrize && nextPrize.items.length > 0 && (
+                <div style={{
+                  position: 'absolute', left: '2rem', top: '50%', transform: 'translateY(-50%)',
+                  pointerEvents: 'none', width: 'min(22vw, 240px)',
+                }}>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                    background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)',
+                    borderRadius: 16, padding: '1.25rem',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      Premie #{nextPrize.position}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                      {nextPrize.items.map(item => (
+                        <img key={item.id} src={item.imageUrl} alt={item.name}
+                          style={{ width: `min(${Math.floor(18 / nextPrize.items.length)}vw, ${Math.floor(160 / nextPrize.items.length)}px)`, height: 'min(22vw, 200px)', objectFit: 'contain', borderRadius: 10 }}
+                          onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                      ))}
+                    </div>
+                    <div>
+                      {nextPrize.items.map(item => (
+                        <div key={item.id} style={{ color: 'white', fontWeight: 600, fontSize: 'min(3vw, 1rem)', lineHeight: 1.4, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          {item.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── winner phase: announcement ── */}
+              {phase === 'winner' && latestWinner && (
+                <div style={{
+                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                 }}>
                   <div style={{ color: 'white', textAlign: 'center', animation: 'modal-in 0.4s ease-out' }}>
                     <div style={{ fontSize: 'min(16vw, 16vh)', fontWeight: 800, lineHeight: 1.1 }}>
@@ -271,48 +393,43 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                       🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Bottles remaining */}
-              {lottery?.wineCount != null && winners.length < lottery.wineCount && !animating && (
-                <div style={{
-                  position: 'absolute', bottom: '2rem', left: 0, right: 0,
-                  textAlign: 'center', pointerEvents: 'none',
-                  color: 'rgba(255,255,255,0.7)', fontSize: 'min(3vw, 3vh)',
-                }}>
-                  {winesLeftMessage(lottery.wineCount - winners.length)}
-                </div>
-              )}
-
-              {/* Winners list */}
-              {winners.length > 0 && (
-                <div
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    position: 'absolute', bottom: '1.5rem', right: '1.5rem', zIndex: 10,
-                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-                    minWidth: 180, maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto',
-                    cursor: 'default',
-                  }}
-                >
-                  <div style={{
-                    padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 700,
-                  }}>
-                    🏆 Vinnere ({winners.length}{lottery?.wineCount ? `/${lottery.wineCount}` : ''})
-                  </div>
-                  {[...winners].reverse().map(w => (
-                    <div key={w.position} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      padding: '0.45rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    }}>
-                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', minWidth: 20 }}>#{w.position}</span>
-                      <span style={{ fontWeight: 700, color: 'white', flex: 1, fontSize: '0.9rem' }}>{w.participantTag}</span>
-                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>#{w.ticketNumber}</span>
+                  {!allDrawn && (
+                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 'min(2.5vw, 1rem)', marginTop: '3rem' }}>
+                      Klikk for å avdekke neste premie →
                     </div>
-                  ))}
+                  )}
+                </div>
+              )}
+
+              {/* ── nextPrize phase: big prize reveal ── */}
+              {phase === 'nextPrize' && (
+                <div style={{
+                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: '1.5rem', animation: 'modal-in 0.35s ease-out',
+                }}>
+                  <div style={{ fontSize: 'min(3vw, 1.1rem)', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    Neste premie — #{nextPrize?.position ?? '?'}
+                  </div>
+                  {nextPrize && nextPrize.items.length > 0 ? (<>
+                    <div style={{ display: 'flex', gap: 'min(3vw, 2rem)', justifyContent: 'center', alignItems: 'flex-end' }}>
+                      {nextPrize.items.map(item => (
+                        <img key={item.id} src={item.imageUrl} alt={item.name}
+                          style={{ width: 'min(40vw, 380px)', height: 'min(60vh, 560px)', objectFit: 'contain', borderRadius: 12, filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.7))' }}
+                          onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                      ))}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      {nextPrize.items.map(item => (
+                        <div key={item.id} style={{ color: 'white', fontWeight: 700, fontSize: 'min(4vw, 1.6rem)', lineHeight: 1.35 }}>{item.name}</div>
+                      ))}
+                    </div>
+                  </>) : (
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 'min(4vw, 1.4rem)' }}>Premie ikke tildelt</div>
+                  )}
+                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 'min(2.5vw, 1rem)', marginTop: '0.5rem' }}>
+                    Klikk for å spinne 🎰
+                  </div>
                 </div>
               )}
             </div>

@@ -90,6 +90,7 @@ export function ParticipantAutocomplete({
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(i => Math.max(i - 1, 0)) }
     else if (e.key === 'Enter') { e.preventDefault(); if (filtered[highlighted]) select(filtered[highlighted]) }
     else if (e.key === 'Escape') setOpen(false)
+    else if (e.key === 'Tab') { if (filtered[highlighted]) select(filtered[highlighted]); setOpen(false) }
   }
 
   return (

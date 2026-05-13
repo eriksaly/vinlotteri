@@ -46,6 +46,35 @@ data class StartDrawingRequest(
     val wineCount: Int
 )
 
+data class CreateInventoryItemRequest(
+    val vinmonopoletCode: String,
+    val name: String,
+    val price: Double,
+    val category: String,
+    val quantity: Int = 1,
+    val country: String = ""
+)
+
+data class BulkAddInventoryRequest(
+    val items: List<CreateInventoryItemRequest>
+)
+
+data class UpdateInventoryItemRequest(
+    val name: String,
+    val price: Double,
+    val category: String,
+    val quantity: Int,
+    val country: String = ""
+)
+
+data class SetPrizeSlotsRequest(
+    val count: Int
+)
+
+data class AssignPrizeItemsRequest(
+    val inventoryItemIds: List<Long>
+)
+
 // --- Responses ---
 
 data class ParticipantDto(
@@ -74,13 +103,33 @@ data class LotteryInfoDto(
     val createdAt: Instant
 )
 
+data class InventoryItemDto(
+    val id: Long,
+    val vinmonopoletCode: String,
+    val name: String,
+    val price: Double,
+    val category: String,
+    val quantity: Int,
+    val country: String,
+    val imageUrl: String,
+    val createdAt: Instant
+)
+
+data class LotteryPrizeDto(
+    val id: Long,
+    val position: Int,
+    val items: List<InventoryItemDto>,
+    val winnerId: Long?
+)
+
 data class WinnerDto(
     val position: Int,
     val ticketNumber: Int,
     val participantId: Long,
     val participantName: String,
     val participantTag: String,
-    val drawnAt: Instant
+    val drawnAt: Instant,
+    val prize: LotteryPrizeDto? = null
 )
 
 data class ParticipantStatsDto(
@@ -107,7 +156,8 @@ data class StatisticsDto(
 
 data class DrawResultDto(
     val winner: WinnerDto,
-    val remainingTickets: Long
+    val remainingTickets: Long,
+    val prize: LotteryPrizeDto? = null
 )
 
 // --- All-time statistics ---
@@ -150,7 +200,8 @@ data class VinmonopoletProductDto(
     val name: String,
     val price: Double?,
     val url: String,
-    val category: String
+    val category: String,
+    val country: String = ""
 )
 
 data class ShoppingSuggestionsDto(
