@@ -27,7 +27,7 @@ export default function Login() {
           <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🗝️</div>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Velkommen til kjelleren</h1>
           <p style={{ opacity: 0.75, fontSize: '0.9rem', marginTop: '0.4rem' }}>
-            Kun verdige isys-ansatte slipper inn
+            Kun verdige slipper inn
           </p>
         </div>
         <div className="card">
@@ -38,7 +38,7 @@ export default function Login() {
               </div>
             )}
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Logg inn med din isys.no Google-konto for å få adgang til kjelleren.
+              Logg inn med din Google-konto for å få adgang til kjelleren.
             </p>
             <a
               href="/oauth2/authorization/google"
