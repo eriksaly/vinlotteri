@@ -2,18 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import type { LotteryInfo, LotteryPrize, InventoryItem } from '../../types'
 
-// Category order for auto-fill: beer → white/rosé → reds (with sparkling mixed in) → spirits
-const AUTO_FILL_ORDER = [
-  'Øl',
-  'Hvitvin', 'Rosévin',
-  'Rødvin', 'Musserende vin',
-  'Gin', 'Whisky', 'Akevitt', 'Brennevin', 'Druebrennevin', 'Likør',
-]
-
-function categoryRank(category: string): number {
-  const idx = AUTO_FILL_ORDER.findIndex(c => c.toLowerCase() === category.toLowerCase())
-  return idx === -1 ? AUTO_FILL_ORDER.length : idx
-}
 
 export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) {
   const [prizes, setPrizes] = useState<LotteryPrize[]>([])

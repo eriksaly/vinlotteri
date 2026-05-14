@@ -1,32 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser'
 
 export default function BarcodeScanner({ onScanned, onClose }: { onScanned: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null)
+  const controlsRef = useRef<IScannerControls | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader()
-    readerRef.current = reader
 
     reader.decodeFromConstraints(
       { video: { facingMode: 'environment' } },
       videoRef.current!,
-      (result, err) => {
+      (result) => {
         if (result) {
-          reader.reset()
+          controlsRef.current?.stop()
           onScanned(result.getText())
         }
-        if (err && !(err.message?.includes('No MultiFormat Readers'))) {
-          // suppress continuous "no barcode found" noise
-        }
       }
-    ).catch(() => {
+    ).then(controls => {
+      controlsRef.current = controls
+    }).catch(() => {
       setError('Kunne ikke åpne kamera. Sjekk at nettleseren har tilgang.')
     })
 
-    return () => { reader.reset() }
+    return () => { controlsRef.current?.stop() }
   }, [onScanned])
 
   return (
