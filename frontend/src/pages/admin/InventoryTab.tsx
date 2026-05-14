@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../../api/client'
 import type { InventoryItem, VinmonopoletProduct } from '../../types'
 import { useConfirm } from './shared'
-import BarcodeScanner from './BarcodeScanner'
 
 export default function InventoryTab() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -17,7 +16,6 @@ export default function InventoryTab() {
   const [lookupPreview, setLookupPreview] = useState<VinmonopoletProduct | null>(null)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
-  const [showScanner, setShowScanner] = useState(false)
   const quickRef = useRef<HTMLInputElement>(null)
   const { confirm, dialog } = useConfirm()
 
@@ -63,7 +61,8 @@ export default function InventoryTab() {
         name: lookupPreview.name,
         price: lookupPreview.price ?? 0,
         category: lookupPreview.category,
-        quantity: 1
+        quantity: 1,
+        country: lookupPreview.country
       })
       setQuickCode('')
       setLookupPreview(null)
@@ -165,22 +164,7 @@ export default function InventoryTab() {
             <button className="btn btn-primary btn-sm" onClick={() => doLookup(quickCode)} disabled={lookingUp || !quickCode.trim()}>
               {lookingUp ? '⏳' : '🔍'} Hent
             </button>
-            <button className="btn btn-sm" onClick={() => setShowScanner(true)} disabled={lookingUp} title="Scan strekkode">
-              📷
-            </button>
           </div>
-          {showScanner && (
-            <BarcodeScanner
-              onScanned={code => {
-                setShowScanner(false)
-                setQuickCode(code)
-                setLookupPreview(null)
-                setLookupError(null)
-                doLookup(code)
-              }}
-              onClose={() => setShowScanner(false)}
-            />
-          )}
 
           {lookupError && (
             <div style={{ marginTop: '0.75rem', color: 'var(--error)', fontSize: '0.9rem' }}>{lookupError}</div>

@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@zxing/browser": "^0.2.0",
     "axios": "^1.8.4",
     "canvas-confetti": "^1.9.3",
     "react": "^19.1.0",

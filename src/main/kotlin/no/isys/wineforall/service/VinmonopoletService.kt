@@ -292,8 +292,9 @@ class VinmonopoletService {
                 .retrieve()
                 .body(String::class.java) ?: return null
             val parsed = objectMapper.readValue(raw, SearchResponse::class.java)
-            val product = (parsed.products ?: emptyList()).firstOrNull { it.code == trimmed }
-                ?: parsed.products?.firstOrNull()
+            val products = parsed.products ?: emptyList()
+            val product = products.firstOrNull { it.code == trimmed }
+                ?: products.firstOrNull()
                 ?: return null
             VinmonopoletProductDto(
                 code = product.code ?: return null,
