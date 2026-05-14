@@ -31,6 +31,11 @@ class InventoryService(
         require(req.vinmonopoletCode.isNotBlank()) { "Varenummer kan ikke være tomt" }
         require(req.name.isNotBlank()) { "Navn kan ikke være tomt" }
         require(req.quantity >= 1) { "Antall må være minst 1" }
+        val existing = inventoryRepo.findByVinmonopoletCode(req.vinmonopoletCode.trim())
+        if (existing != null) {
+            existing.quantity += req.quantity
+            return inventoryRepo.save(existing).toDto()
+        }
         val item = inventoryRepo.save(
             InventoryItem(
                 vinmonopoletCode = req.vinmonopoletCode.trim(),

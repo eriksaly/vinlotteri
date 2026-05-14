@@ -31,18 +31,26 @@ export default function Dashboard() {
     loadLottery().finally(() => setLoading(false))
   }, [loadLottery])
 
+  const [createError, setCreateError] = useState<string | null>(null)
+
   const createLottery = async () => {
     try {
       const r = await api.post<LotteryInfo>('/api/admin/lottery')
       setLottery(r.data)
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved opprettelse')
+      setCreateError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved opprettelse')
+      setTimeout(() => setCreateError(null), 4000)
     }
   }
 
   return (
     <div className="page">
       <NavBar />
+      {createError && (
+        <div style={{ position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, padding: '0.75rem 1.25rem', borderRadius: 8, fontWeight: 500, fontSize: '0.9rem', background: '#7f1d1d', color: 'white', border: '1px solid #991b1b' }}>
+          ⚠️ {createError}
+        </div>
+      )}
 
       <div style={{ background: 'var(--wine-dark)', color: 'white', padding: '1rem 0' }}>
         <div className="container" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
