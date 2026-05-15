@@ -30,7 +30,7 @@ export default function StatisticsPage() {
         <div className="container">
           <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🏆</div>
           <h1 className="page-title">Hall of Vino</h1>
-          <p className="page-subtitle">Hvem har drukket mest på bedriftens regning? Her er fasiten.</p>
+          <p className="page-subtitle">Her måles flaks i flasker.</p>
         </div>
       </div>
 
@@ -53,39 +53,6 @@ export default function StatisticsPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-              {/* Latest lottery winners */}
-              {lotteries.length > 0 && lotteries[0].winners.length > 0 && (
-                <div className="card">
-                  <div className="card-header" style={{ background: 'var(--wine)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    🏆 Siste trekning — {lotteries[0].lotteryName}
-                  </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="table">
-                      <thead>
-                        <tr><th>#</th><th>Navn</th><th>Lodd</th></tr>
-                      </thead>
-                      <tbody>
-                        {lotteries[0].winners.map(w => {
-                          const p = lotteries[0].participants.find(p => p.participantId === w.participantId)
-                          return (
-                            <tr key={w.position}>
-                              <td><span style={{ fontSize: '1.1rem' }}>#{w.position}</span></td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                  {p && <MiniAvatar participant={p} />}
-                                  <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
-                                </div>
-                              </td>
-                              <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>#{w.ticketNumber}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
               {/* Header summary */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
                 <StatCard emoji="🍾" label="Lotterier avholdt" value={stats.totalLotteries.toString()} />
@@ -104,7 +71,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Navn</th><th>Vinnersjanser brukt</th></tr>
+                          <tr><th>#</th><th>Navn</th><th>Vinprosent</th></tr>
                         </thead>
                         <tbody>
                           {stats.topLucky.map((p, i) => (
@@ -115,7 +82,7 @@ export default function StatisticsPage() {
                                   <MiniAvatar participant={p} />
                                   <div>
                                     <span style={{ fontWeight: 600 }}>{p.name}</span>
-                                    {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Gjeldende vinkjær</div>}
+                                    {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Universets yndling</div>}
                                   </div>
                                 </div>
                               </td>
@@ -144,7 +111,7 @@ export default function StatisticsPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr><th>#</th><th>Navn</th><th>Livets urettferdighet</th></tr>
+                          <tr><th>#</th><th>Navn</th><th>Vinprosent</th></tr>
                         </thead>
                         <tbody>
                           {stats.topUnlucky.map((p, i) => (

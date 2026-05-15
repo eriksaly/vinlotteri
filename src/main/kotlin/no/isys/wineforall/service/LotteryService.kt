@@ -238,6 +238,10 @@ class LotteryService(
                     curLose++; curWin = 0
                 }
             }
+            // Streak only counts if the participant played in the most recent closed lottery.
+            // This prevents someone from permanently holding a streak after stopping.
+            val lastLottery = lotteriesChronological.lastOrNull()
+            if (participated.lastOrNull()?.id != lastLottery?.id) { curWin = 0; curLose = 0 }
             val streak = StreakDto(participant.id, participant.name, participant.tag, participant.photoData != null, 0, participated.size)
             if (curWin > (longestWinStreak?.streak ?: 0)) longestWinStreak = streak.copy(streak = curWin)
             if (curLose > (longestLoseStreak?.streak ?: 0)) longestLoseStreak = streak.copy(streak = curLose)
