@@ -16,13 +16,8 @@ class LotteryPrize(
     @Column(nullable = false)
     val position: Int,
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "lottery_prize_items",
-        joinColumns = [JoinColumn(name = "prize_id")],
-        inverseJoinColumns = [JoinColumn(name = "inventory_item_id")]
-    )
-    var items: MutableList<InventoryItem> = mutableListOf(),
+    @OneToMany(mappedBy = "prize", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
+    var slots: MutableList<PrizeItemSlot> = mutableListOf(),
 
     @Column(nullable = false)
     val createdAt: Instant = Instant.now()

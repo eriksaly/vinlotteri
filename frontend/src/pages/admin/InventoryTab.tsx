@@ -99,11 +99,14 @@ export default function InventoryTab() {
     }
   }
 
-  const deleteItem = async (id: number) => {
-    if (!await confirm('Fjerne fra lager?')) return
+  const deleteItem = async (item: InventoryItem) => {
+    const msg = item.quantity > 1
+      ? `Fjerne én ${item.name} fra lager? (${item.quantity} på lager)`
+      : `Fjerne ${item.name} fra lager helt?`
+    if (!await confirm(msg)) return
     try {
-      await api.delete(`/api/admin/inventory/${id}`)
-      setToast({ msg: 'Fjernet fra lager', ok: true })
+      await api.delete(`/api/admin/inventory/${item.id}`)
+      setToast({ msg: item.quantity > 1 ? `Én ${item.name} fjernet` : 'Fjernet fra lager', ok: true })
       await load()
     } catch (e: unknown) {
       setToast({ msg: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved sletting', ok: false })
@@ -316,7 +319,7 @@ export default function InventoryTab() {
                         <td>
                           <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-sm" onClick={() => startEdit(item)}>✏️</button>
-                            <button className="btn btn-sm" style={{ color: 'var(--error)' }} onClick={() => deleteItem(item.id)}>🗑️</button>
+                            <button className="btn btn-sm" style={{ color: 'var(--error)' }} onClick={() => deleteItem(item)}>🗑️</button>
                           </div>
                         </td>
                       </>

@@ -296,12 +296,16 @@ class VinmonopoletService {
             val product = products.firstOrNull { it.code == trimmed }
                 ?: products.firstOrNull()
                 ?: return null
+            val mainCatName = product.mainCategory?.name ?: ""
+            // For beer, use the main category ("Øl") — sub-categories like "Pale ale" don't identify beer type
+            val category = if (mainCatName.equals("Øl", ignoreCase = true)) mainCatName
+                           else product.mainSubCategory?.name ?: mainCatName
             VinmonopoletProductDto(
                 code = product.code ?: return null,
                 name = product.name ?: return null,
                 price = product.price?.value,
                 url = "https://www.vinmonopolet.no${product.url ?: "/p/${product.code}"}",
-                category = product.mainSubCategory?.name ?: product.mainCategory?.name ?: "",
+                category = category,
                 country = product.mainCountry?.name ?: ""
             )
         } catch (e: Exception) {

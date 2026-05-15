@@ -60,37 +60,52 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
     const undrawnPrizes = prizes.filter(p => p.winnerId == null)
     if (undrawnPrizes.length === 0) return
 
-    const spiritCats = new Set(['gin', 'whisky', 'akevitt', 'brennevin', 'druebrennevin', 'likør'])
+    const BEER_SUBCATS = ['ale', 'lager', 'porter', 'stout', 'pils', 'hveteøl', 'surøl']
+    const isBeer = (cat: string) => {
+      const c = cat.toLowerCase()
+      return c === 'øl' || c.includes('øl') || BEER_SUBCATS.some(s => c.includes(s))
+    }
+    const SPIRIT_SUBCATS = ['gin', 'whisky', 'whiskey', 'akevitt', 'brennevin', 'druebrennevin', 'likør', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac']
+    const isSpirit = (cat: string) => SPIRIT_SUBCATS.some(s => cat.toLowerCase().includes(s))
 
-    // Beer: group by country/region — 3 bottles from the same country = 1 prize
-    const sortedBeers = [...inventory]
-      .filter(i => i.category.toLowerCase() === 'øl')
-      .sort((a, b) => a.price - b.price)
-    // Beer is always exactly 1 prize slot — pick the first complete group of 3 from same country.
-    // Countries with <3 beers fall back to a mixed group.
+    // Beer: prefer a country-group of 3 unique types, fall back to however many are available
+    const allBeers = [...inventory].filter(i => isBeer(i.category))
     const beerByCountry = new Map<string, InventoryItem[]>()
-    for (const beer of sortedBeers) {
+    for (const beer of allBeers) {
       const key = beer.country.trim() || 'Ukjent'
       if (!beerByCountry.has(key)) beerByCountry.set(key, [])
       beerByCountry.get(key)!.push(beer)
     }
-    const firstCompleteCountry = [...beerByCountry.values()].find(g => g.length >= 3)
-    const beerGroup = firstCompleteCountry
-      ? firstCompleteCountry.slice(0, 3)
-      : sortedBeers.slice(0, 3)
-    const beerGroups: InventoryItem[][] = beerGroup.length > 0 ? [beerGroup] : []
+    const completeCountry = [...beerByCountry.values()].find(g => g.length >= 3)
+    // Build list of up to 3 beer IDs — repeat same item if not enough unique types
+    const buildBeerIds = (beers: InventoryItem[]): number[] => {
+      const ids: number[] = []
+      for (const beer of beers) {
+        const times = Math.min(beer.quantity, 3 - ids.length)
+        for (let i = 0; i < times; i++) ids.push(beer.id)
+        if (ids.length >= 3) break
+      }
+      return ids
+    }
+    const beerGroup = completeCountry
+      ? completeCountry.sort(() => Math.random() - 0.5)
+      : allBeers
+    const beerIds = buildBeerIds(beerGroup)
+    const beerGroups: number[][] = beerIds.length > 0 ? [beerIds] : []
 
     // Reserve a random spirit for the last slot
-    const allSpirits = inventory.filter(i => spiritCats.has(i.category.toLowerCase()))
+    const allSpirits = inventory.filter(i => isSpirit(i.category))
     const reservedSpirit = allSpirits.length > 0
       ? allSpirits[Math.floor(Math.random() * allSpirits.length)]
       : null
 
-    // Everything else: non-beer, not the reserved spirit — cap hvitvin/rosévin/musserende at 1 each, shuffle the rest
-    const cappedCats = new Set(['hvitvin', 'rosévin', 'musserende vin'])
+    // Others: non-beer, non-spirit, not the reserved spirit
+    // Cap hvitvin/rosévin/musserende at 1 each, then order: whites+rosé early, reds middle, sparkling ~1/3 in
     const cappedSeen = new Set<string>()
-    const sortedOthers = [...inventory]
-      .filter(i => i.category.toLowerCase() !== 'øl' && i.id !== reservedSpirit?.id)
+    const cappedCats = new Set(['hvitvin', 'rosévin', 'musserende vin'])
+    const earlyTypes = new Set(['hvitvin', 'rosévin'])
+    const others = [...inventory]
+      .filter(i => !isBeer(i.category) && !isSpirit(i.category) && i.id !== reservedSpirit?.id)
       .sort(() => Math.random() - 0.5)
       .filter(i => {
         const cat = i.category.toLowerCase()
@@ -99,10 +114,21 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
         cappedSeen.add(cat)
         return true
       })
+    const earlyItems  = others.filter(i => earlyTypes.has(i.category.toLowerCase()))
+    const sparkItems  = others.filter(i => i.category.toLowerCase() === 'musserende vin')
+    const midItems    = others.filter(i => !earlyTypes.has(i.category.toLowerCase()) && i.category.toLowerCase() !== 'musserende vin')
+    // Insert sparkling ~1/3 into the mid section
+    const sparkPos = Math.max(1, Math.floor(midItems.length / 3))
+    const sortedOthers = [
+      ...earlyItems,
+      ...midItems.slice(0, sparkPos),
+      ...sparkItems,
+      ...midItems.slice(sparkPos),
+    ]
 
-    // Main fill order: beer groups then singles
+    // Main fill order: beer groups first, then ordered others
     const mainAssignments: number[][] = [
-      ...beerGroups.map(g => g.map(i => i.id)),
+      ...beerGroups,
       ...sortedOthers.map(i => [i.id]),
     ]
 
@@ -251,7 +277,13 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                         {prize.winnerId == null && (
                           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '0 2px' }}
                             disabled={busy}
-                            onClick={() => assignItems(prize.position, prize.items.filter(i => i.id !== item.id).map(i => i.id))}>
+                            onClick={() => {
+                              let skipped = false
+                              assignItems(prize.position, prize.items.flatMap(i => {
+                                if (i.id === item.id && !skipped) { skipped = true; return [] }
+                                return [i.id]
+                              }))
+                            }}>
                             ✕
                           </button>
                         )}

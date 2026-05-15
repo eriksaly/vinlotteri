@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository
 @Repository
 interface LotteryPrizeRepository : JpaRepository<LotteryPrize, Long> {
 
-    @Query("SELECT p FROM LotteryPrize p LEFT JOIN FETCH p.items WHERE p.lottery = :lottery ORDER BY p.position")
+    @Query("SELECT DISTINCT p FROM LotteryPrize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE p.lottery = :lottery ORDER BY p.position")
     fun findAllByLotteryOrderByPosition(lottery: Lottery): List<LotteryPrize>
 
     fun findByLotteryAndPosition(lottery: Lottery, position: Int): LotteryPrize?
@@ -18,12 +18,6 @@ interface LotteryPrizeRepository : JpaRepository<LotteryPrize, Long> {
     fun countByLottery(lottery: Lottery): Int
 
     fun deleteAllByLottery(lottery: Lottery)
-
-    @Query("SELECT p FROM LotteryPrize p JOIN FETCH p.items i WHERE i.id = :itemId")
-    fun findAllContainingItem(itemId: Long): List<LotteryPrize>
-
-    @Query("SELECT i.id FROM LotteryPrize p JOIN p.items i")
-    fun findAllAssignedItemIds(): List<Long>
 
     // Clears the legacy inventory_item_id column left over from before the ManyToMany migration
     @Modifying

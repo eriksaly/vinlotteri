@@ -86,7 +86,9 @@ class DrawingService(
     private fun no.isys.wineforall.model.LotteryPrize.toDto(winnerId: Long) = LotteryPrizeDto(
         id = id,
         position = position,
-        items = items.map { with(inventoryService) { it.toDto() } },
+        items = slots.flatMap { slot ->
+            List(slot.quantity) { with(inventoryService) { slot.inventoryItem.toDto() } }
+        },
         winnerId = winnerId
     )
 }

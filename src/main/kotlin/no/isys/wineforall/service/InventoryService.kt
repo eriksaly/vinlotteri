@@ -7,17 +7,21 @@ import no.isys.wineforall.dto.UpdateInventoryItemRequest
 import no.isys.wineforall.model.InventoryItem
 import no.isys.wineforall.repository.InventoryItemRepository
 import no.isys.wineforall.repository.LotteryPrizeRepository
+import no.isys.wineforall.repository.PrizeItemSlotRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class InventoryService(
     private val inventoryRepo: InventoryItemRepository,
-    private val prizeRepo: LotteryPrizeRepository
+    private val prizeRepo: LotteryPrizeRepository,
+    private val slotRepo: PrizeItemSlotRepository
 ) {
 
     fun getAll(): List<InventoryItemDto> {
-        val assignedCounts = prizeRepo.findAllAssignedItemIds().groupingBy { it }.eachCount()
+        val assignedCounts = slotRepo.findAllWithItem()
+            .groupBy { it.inventoryItem.id }
+            .mapValues { (_, slots) -> slots.sumOf { it.quantity } }
         return inventoryRepo.findAll()
             .sortedBy { it.createdAt }
             .mapNotNull { item ->
@@ -67,15 +71,15 @@ class InventoryService(
 
     @Transactional
     fun delete(id: Long) {
-        // Remove from ManyToMany join table (lottery_prize_items)
-        val prizes = prizeRepo.findAllContainingItem(id)
-        prizes.forEach { prize ->
-            prize.items.removeIf { it.id == id }
-            prizeRepo.save(prize)
+        val item = inventoryRepo.findById(id).orElseThrow { IllegalArgumentException("Varebeholdning ikke funnet") }
+        if (item.quantity > 1) {
+            item.quantity -= 1
+            inventoryRepo.save(item)
+        } else {
+            slotRepo.deleteAllByInventoryItemId(id)
+            prizeRepo.clearLegacyItemColumn(id)
+            inventoryRepo.deleteById(id)
         }
-        // Clear legacy inventory_item_id FK column left from pre-ManyToMany schema
-        prizeRepo.clearLegacyItemColumn(id)
-        inventoryRepo.deleteById(id)
     }
 
     fun InventoryItem.toDto(quantityOverride: Int? = null) = InventoryItemDto(

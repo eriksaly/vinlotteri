@@ -5,6 +5,7 @@ import no.isys.wineforall.dto.LotteryPrizeDto
 import no.isys.wineforall.model.Lottery
 import no.isys.wineforall.model.LotteryPrize
 import no.isys.wineforall.model.LotteryStatus
+import no.isys.wineforall.model.PrizeItemSlot
 import no.isys.wineforall.model.Winner
 import no.isys.wineforall.repository.InventoryItemRepository
 import no.isys.wineforall.repository.LotteryPrizeRepository
@@ -63,8 +64,15 @@ class PrizeService(
         val lottery = getCurrentActiveOrDrawingLottery() ?: error("Ingen aktiv lotteri")
         val prize = prizeRepo.findByLotteryAndPosition(lottery, position)
             ?: error("Premie #$position finnes ikke")
-        val items = inventoryRepo.findAllById(req.inventoryItemIds)
-        prize.items = items.toMutableList()
+
+        // Count how many times each ID appears (allows same item multiple times)
+        val countById = req.inventoryItemIds.groupingBy { it }.eachCount()
+        val items = inventoryRepo.findAllById(countById.keys)
+
+        prize.slots.clear()
+        items.forEach { item ->
+            prize.slots.add(PrizeItemSlot(prize = prize, inventoryItem = item, quantity = countById[item.id] ?: 1))
+        }
         prizeRepo.save(prize)
         val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
         return prize.toDto(winners)
@@ -82,7 +90,9 @@ class PrizeService(
         return LotteryPrizeDto(
             id = id,
             position = position,
-            items = items.map { with(inventoryService) { it.toDto() } },
+            items = slots.flatMap { slot ->
+                List(slot.quantity) { with(inventoryService) { slot.inventoryItem.toDto() } }
+            },
             winnerId = winnerId
         )
     }
