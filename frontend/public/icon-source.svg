@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="#7B1D47"/>
+  <!-- Wine glass bowl -->
+  <path d="M180 80 L332 80 L310 200 Q310 270 256 290 Q202 270 202 200 Z" fill="#F5E6EC" opacity="0.9"/>
+  <!-- Wine fill in bowl -->
+  <path d="M195 160 L317 160 L310 200 Q310 270 256 290 Q202 270 202 200 Z" fill="#C0395A" opacity="0.85"/>
+  <!-- Glass stem -->
+  <rect x="246" y="290" width="20" height="110" fill="#F5E6EC" opacity="0.9"/>
+  <!-- Glass base -->
+  <ellipse cx="256" cy="410" rx="70" ry="15" fill="#F5E6EC" opacity="0.9"/>
+</svg>
