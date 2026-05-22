@@ -188,10 +188,10 @@ export default function StatisticsPage() {
               </div>
 
               {/* Streaks */}
-              {(stats.longestWinStreak || stats.longestLoseStreak) && (
+              {(stats.longestWinStreak.length > 0 || stats.longestLoseStreak.length > 0) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                  {stats.longestWinStreak && <StreakCard streak={stats.longestWinStreak} type="win" />}
-                  {stats.longestLoseStreak && <StreakCard streak={stats.longestLoseStreak} type="lose" />}
+                  {stats.longestWinStreak.length > 0 && <StreakCard streaks={stats.longestWinStreak} type="win" />}
+                  {stats.longestLoseStreak.length > 0 && <StreakCard streaks={stats.longestLoseStreak} type="lose" />}
                 </div>
               )}
 
@@ -315,32 +315,33 @@ export default function StatisticsPage() {
   )
 }
 
-function StreakCard({ streak, type }: { streak: Streak; type: 'win' | 'lose' }) {
+function StreakCard({ streaks, type }: { streaks: Streak[]; type: 'win' | 'lose' }) {
   const isWin = type === 'win'
+  const streak = streaks[0].streak
   return (
     <div className="card">
       <div className="card-header" style={{ background: isWin ? 'var(--wine)' : '#4a4a5a', color: 'white' }}>
         {isWin ? '🔥 Ustoppelig vinmaskin' : '🌧️ Kjellerdøra nekter å åpne seg'}
       </div>
-      <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <MiniAvatar participant={streak} size="lg" />
-        <div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{streak.name}</div>
-          <div style={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '0.1em' }}>
-            {isWin
-              ? Array(streak.streak).fill('🍷').join('')
-              : <span style={{ color: 'var(--danger)' }}>{Array(streak.streak).fill('✕').join('')}</span>}
-          </div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            {isWin
-              ? `${streak.streak} trekkinger på rad. Flaks eller verdig?`
-              : `${streak.streak} trekkinger på rad uten en eneste flaske.`}
-          </div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.3rem' }}>
-            {streak.lotteriesParticipated} totalt deltatt
+      <div style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '0.1em', padding: '0.75rem 1.25rem 0' }}>
+        {isWin
+          ? Array(streak).fill('🍷').join('')
+          : <span style={{ color: 'var(--danger)' }}>{Array(streak).fill('✕').join('')}</span>}
+      </div>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0.25rem 1.25rem 0.5rem' }}>
+        {isWin
+          ? `${streak} trekkinger på rad. Flaks eller verdig?`
+          : `${streak} trekkinger på rad uten en eneste flaske.`}
+      </div>
+      {streaks.map(s => (
+        <div key={s.participantId} className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+          <MiniAvatar participant={s} size="lg" />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.name}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{s.lotteriesParticipated} totalt deltatt</div>
           </div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }

@@ -189,8 +189,8 @@ data class AllTimeStatisticsDto(
     val topLucky: List<AllTimeParticipantStatsDto>,
     val topUnlucky: List<AllTimeParticipantStatsDto>,
     val topTicketBuyers: List<AllTimeParticipantStatsDto>,
-    val longestWinStreak: StreakDto?,
-    val longestLoseStreak: StreakDto?
+    val longestWinStreak: List<StreakDto>,
+    val longestLoseStreak: List<StreakDto>
 )
 
 // --- Vinmonopolet shopping ---

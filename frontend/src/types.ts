@@ -117,8 +117,8 @@ export interface AllTimeStatistics {
   topLucky: AllTimeParticipantStats[]
   topUnlucky: AllTimeParticipantStats[]
   topTicketBuyers: AllTimeParticipantStats[]
-  longestWinStreak: Streak | null
-  longestLoseStreak: Streak | null
+  longestWinStreak: Streak[]
+  longestLoseStreak: Streak[]
 }
 
 export interface DrawResult {

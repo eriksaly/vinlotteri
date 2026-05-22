@@ -184,7 +184,7 @@ class LotteryService(
 
     fun getAllTimeStatistics(): AllTimeStatisticsDto {
         val closedLotteries = lotteryRepo.findAllByStatusOrderByCreatedAtDesc(LotteryStatus.CLOSED)
-        if (closedLotteries.isEmpty()) return AllTimeStatisticsDto(0, 0, emptyList(), emptyList(), emptyList(), null, null)
+        if (closedLotteries.isEmpty()) return AllTimeStatisticsDto(0, 0, emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
 
         val lotteriesChronological = closedLotteries.reversed()
         val allParticipants = participantRepo.findAll()
@@ -223,8 +223,9 @@ class LotteryService(
         }
 
         // Streaks — all in-memory now
-        var longestWinStreak: StreakDto? = null
-        var longestLoseStreak: StreakDto? = null
+        val lastLottery = lotteriesChronological.lastOrNull()
+        val winStreaks = mutableListOf<StreakDto>()
+        val loseStreaks = mutableListOf<StreakDto>()
 
         allParticipants.forEach { participant ->
             val participated = lotteriesChronological.filter { (ticketCount[it.id]?.get(participant.id) ?: 0L) > 0 }
@@ -240,12 +241,16 @@ class LotteryService(
             }
             // Streak only counts if the participant played in the most recent closed lottery.
             // This prevents someone from permanently holding a streak after stopping.
-            val lastLottery = lotteriesChronological.lastOrNull()
             if (participated.lastOrNull()?.id != lastLottery?.id) { curWin = 0; curLose = 0 }
             val streak = StreakDto(participant.id, participant.name, participant.tag, participant.photoData != null, 0, participated.size)
-            if (curWin > (longestWinStreak?.streak ?: 0)) longestWinStreak = streak.copy(streak = curWin)
-            if (curLose > (longestLoseStreak?.streak ?: 0)) longestLoseStreak = streak.copy(streak = curLose)
+            if (curWin > 1) winStreaks.add(streak.copy(streak = curWin))
+            if (curLose > 1) loseStreaks.add(streak.copy(streak = curLose))
         }
+
+        val topWinStreak = winStreaks.maxOfOrNull { it.streak } ?: 0
+        val topLoseStreak = loseStreaks.maxOfOrNull { it.streak } ?: 0
+        val longestWinStreaks = winStreaks.filter { it.streak == topWinStreak }.takeIf { it.isNotEmpty() } ?: emptyList()
+        val longestLoseStreaks = loseStreaks.filter { it.streak == topLoseStreak }.takeIf { it.isNotEmpty() } ?: emptyList()
 
         return AllTimeStatisticsDto(
             totalLotteries = closedLotteries.size,
@@ -255,8 +260,8 @@ class LotteryService(
             topUnlucky = participantStats.filter { it.lotteriesParticipated >= 1 }
                 .sortedWith(compareBy({ if (it.totalTicketsBought > 0) it.totalWins.toDouble() / it.totalTicketsBought else 0.0 }, { -it.totalTicketsBought })).take(5),
             topTicketBuyers = participantStats.sortedByDescending { it.totalTicketsBought }.take(10),
-            longestWinStreak = longestWinStreak?.takeIf { it.streak > 1 },
-            longestLoseStreak = longestLoseStreak?.takeIf { it.streak > 1 }
+            longestWinStreak = longestWinStreaks,
+            longestLoseStreak = longestLoseStreaks
         )
     }
 
