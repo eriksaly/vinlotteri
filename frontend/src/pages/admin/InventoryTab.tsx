@@ -134,6 +134,11 @@ export default function InventoryTab() {
     }
   }
 
+  const totalPrizes = items.reduce((sum, item) => {
+    const isBeer = item.category.toLowerCase().includes('øl')
+    return sum + (isBeer ? Math.floor(item.quantity / 3) : item.quantity)
+  }, 0)
+
   if (loading) return <div className="card"><div className="card-body">Laster lager...</div></div>
 
   return (
@@ -202,7 +207,16 @@ export default function InventoryTab() {
 
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Lagerbeholdning ({items.length} produkter)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>Lagerbeholdning ({items.length} produkter)</span>
+            <span style={{
+              background: 'var(--wine)', color: 'white',
+              borderRadius: 20, padding: '0.15rem 0.75rem',
+              fontSize: '0.85rem', fontWeight: 700,
+            }}>
+              🍷 {totalPrizes} premier
+            </span>
+          </div>
           <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}>
             {showAddForm ? '✕ Avbryt' : '+ Legg til'}
           </button>

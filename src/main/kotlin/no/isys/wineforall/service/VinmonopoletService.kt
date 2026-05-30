@@ -40,24 +40,29 @@ class VinmonopoletService {
         "brennevin_akevitt"       to "Akevitt",       // 10%
     )
 
-    fun getSuggestions(prizeCount: Int, budgetPerLottery: Int?, lotteryCount: Int = 1): ShoppingSuggestionsDto {
-        require(prizeCount >= 5) { "Minst 5 premier kreves" }
+    fun getSuggestions(
+        prizeCount: Int,
+        budgetPerLottery: Int?,
+        lotteryCount: Int = 1,
+        counts: CategoryCounts? = null
+    ): ShoppingSuggestionsDto {
         require(lotteryCount >= 1) { "Minst 1 trekning kreves" }
 
-        val nReds = prizeCount - 5
+        val c = counts ?: CategoryCounts.fromPrizeCount(prizeCount)
 
         // Fixed quality targets for all non-red categories.
         // Whatever is left after covering these goes entirely to reds.
         val fixedSparkling = 150.0
         val fixedWhite     = 130.0
         val fixedRose      = 120.0
-        val fixedBeer      = 60.0   // per bottle, 3 bottles
+        val fixedBeer      = 60.0   // per bottle
         val fixedSpirits   = 350.0
 
         val ranges: CategoryRanges? = budgetPerLottery?.let {
-            val reservedCost = fixedSparkling + fixedWhite + fixedRose + (3 * fixedBeer) + fixedSpirits
-            val redBudget = (it.toDouble() - reservedCost).coerceAtLeast(50.0 * nReds)
-            val redTarget = if (nReds > 0) redBudget / nReds else 0.0
+            val reservedCost = fixedSparkling * c.sparkling + fixedWhite * c.white +
+                               fixedRose * c.rose + fixedBeer * c.beer + fixedSpirits * c.spirits
+            val redBudget = (it.toDouble() - reservedCost).coerceAtLeast(50.0 * c.red)
+            val redTarget = if (c.red > 0) redBudget / c.red else 0.0
             CategoryRanges(
                 red      = redTarget,
                 sparkling = fixedSparkling,
@@ -79,6 +84,7 @@ class VinmonopoletService {
         val beerPool  = fetchPool("øl",             ranges?.beer,     null)
 
         // Spirits: picked per lottery so each gets a different category and bottle.
+        // For spirits count > 1 per lottery, pick from the full brennevin pool without subcategory filter.
         // Results cached by subcat to avoid duplicate API calls.
         val spiritsPoolCache = mutableMapOf<String, List<ProductRaw>>()
 
@@ -86,9 +92,7 @@ class VinmonopoletService {
         val usedCodes = mutableSetOf<String>()
 
         // Pre-assign spirits categories across all lotteries so repeats are minimised.
-        // Likør gets 2 slots per cycle (appears twice before others get a second turn).
-        // Other categories get 1 slot each. Weights within each category's slots are
-        // preserved from spiritsVariants. When all slots are consumed the cycle resets.
+        // Only used when c.spirits == 1; for multiple spirits per lottery we use the full pool.
         val spiritsSlots = mapOf("brennevin_likør" to 2)  // others default to 1
         val spiritsAssignments = buildList {
             val remaining = mutableMapOf<String, Int>()
@@ -107,19 +111,29 @@ class VinmonopoletService {
         // Each lottery independently picks its own wine variant and spirits category.
         // Keep raw picks so we can do budget adjustment before converting to DTOs.
         val picked = (1..lotteryCount).mapIndexed { i, _ ->
-            val (spiritsSubcat, spiritsLabel) = spiritsAssignments[i]
-            log.info("Lottery: sparkling=1 white=1 rose=1 spirits={}", spiritsLabel)
-            // Whisky: enforce minimum 350 kr floor to avoid cheap supermarket-tier bottles
-            val whiskyMinFloor = if (spiritsSubcat == "brennevin_whisky") 350 else null
-            val spiritsPool = spiritsPoolCache.getOrPut(spiritsSubcat) {
-                fetchPool("brennevin", ranges?.spirits, spiritsSubcat, minFloor = whiskyMinFloor)
+            val spiritsItems = if (c.spirits == 1) {
+                val (spiritsSubcat, spiritsLabel) = spiritsAssignments[i]
+                log.info("Lottery {}: sparkling={} white={} rose={} beer={} spirits=1 ({})",
+                    i + 1, c.sparkling, c.white, c.rose, c.beer, spiritsLabel)
+                val whiskyMinFloor = if (spiritsSubcat == "brennevin_whisky") 350 else null
+                val spiritsPool = spiritsPoolCache.getOrPut(spiritsSubcat) {
+                    fetchPool("brennevin", ranges?.spirits, spiritsSubcat, minFloor = whiskyMinFloor)
+                }
+                pickRaw(spiritsPool, 1, spiritsLabel, usedCodes)
+            } else {
+                log.info("Lottery {}: sparkling={} white={} rose={} beer={} spirits={}",
+                    i + 1, c.sparkling, c.white, c.rose, c.beer, c.spirits)
+                val fullSpiritsPool = spiritsPoolCache.getOrPut("brennevin_all") {
+                    fetchPool("brennevin", ranges?.spirits, null)
+                }
+                pickRaw(fullSpiritsPool, c.spirits, "Brennevin", usedCodes)
             }
-            pickRaw(redPool,     nReds, "Rødvin",         usedCodes) +
-            pickRaw(sparkPool,   1,     "Musserende vin", usedCodes) +
-            pickRaw(whitePool,   1,     "Hvitvin",        usedCodes) +
-            pickRaw(rosePool,    1,     "Rosévin",        usedCodes) +
-            pickBeersByCountry(beerPool,                   usedCodes) +
-            pickRaw(spiritsPool, 1,     spiritsLabel,     usedCodes)
+            pickRaw(redPool,   c.red,       "Rødvin",         usedCodes) +
+            pickRaw(sparkPool, c.sparkling, "Musserende vin", usedCodes) +
+            pickRaw(whitePool, c.white,     "Hvitvin",        usedCodes) +
+            pickRaw(rosePool,  c.rose,      "Rosévin",        usedCodes) +
+            pickBeersByCountry(beerPool,    c.beer,           usedCodes) +
+            spiritsItems
         }.flatten().toMutableList()
 
         // Budget trim: if total cost exceeds budget, swap out reds for slightly cheaper
@@ -165,7 +179,8 @@ class VinmonopoletService {
             )
         }
 
-        return ShoppingSuggestionsDto(products, prizeCount * lotteryCount)
+        val totalCount = (c.red + c.sparkling + c.white + c.rose + c.beer + c.spirits) * lotteryCount
+        return ShoppingSuggestionsDto(products, totalCount)
     }
 
     // Fetches a pool of in-stock products for a category, optionally filtered by price and subcategory.
@@ -187,17 +202,17 @@ class VinmonopoletService {
 
     private data class PickedProduct(val raw: ProductRaw, val category: String)
 
-    // Picks 3 beers from the same country. Prefers countries with ≥ 3 unused beers.
-    // Falls back to any 3 beers if no country has enough.
-    private fun pickBeersByCountry(pool: List<ProductRaw>, usedCodes: MutableSet<String>): List<PickedProduct> {
+    // Picks beers from the same country where possible. Prefers countries with ≥ count unused beers.
+    // Falls back to any available beers if no country has enough.
+    private fun pickBeersByCountry(pool: List<ProductRaw>, count: Int, usedCodes: MutableSet<String>): List<PickedProduct> {
+        if (count == 0) return emptyList()
         val fresh = pool.filter { (it.code ?: "") !in usedCodes }
         val byCountry = fresh.groupBy { it.mainCountry?.name?.takeIf { c -> c.isNotBlank() } ?: "Ukjent" }
-        val validCountries = byCountry.filter { it.value.size >= 3 }.keys.toList()
+        val validCountries = byCountry.filter { it.value.size >= count }.keys.toList()
         val beers = if (validCountries.isNotEmpty()) {
-            byCountry[validCountries.random()]!!.shuffled().take(3)
+            byCountry[validCountries.random()]!!.shuffled().take(count)
         } else {
-            // No country has 3 fresh beers — fall back to any available
-            fresh.shuffled().take(3).ifEmpty { pool.shuffled().take(3) }
+            fresh.shuffled().take(count).ifEmpty { pool.shuffled().take(count) }
         }
         beers.forEach { usedCodes.add(it.code ?: "") }
         return beers.map { PickedProduct(it, "Øl") }
@@ -270,6 +285,26 @@ class VinmonopoletService {
             log.info("Added {} to cart {}", code, guid)
         }
         return guid
+    }
+
+    data class CategoryCounts(
+        val red: Int,
+        val sparkling: Int,
+        val white: Int,
+        val rose: Int,
+        val beer: Int,
+        val spirits: Int
+    ) {
+        companion object {
+            fun fromPrizeCount(n: Int) = CategoryCounts(
+                red      = maxOf(0, n - 5),
+                sparkling = 1,
+                white    = 1,
+                rose     = 1,
+                beer     = 3,
+                spirits  = 1
+            )
+        }
     }
 
     data class CategoryRanges(

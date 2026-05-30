@@ -120,8 +120,27 @@ class AdminController(
     fun getShoppingSuggestions(
         @RequestParam(defaultValue = "12") prizeCount: Int,
         @RequestParam(required = false) budgetPerLottery: Int?,
-        @RequestParam(defaultValue = "1") lotteryCount: Int
-    ): ShoppingSuggestionsDto = vinmonopoletService.getSuggestions(prizeCount, budgetPerLottery, lotteryCount)
+        @RequestParam(defaultValue = "1") lotteryCount: Int,
+        @RequestParam(required = false) redCount: Int?,
+        @RequestParam(required = false) sparklingCount: Int?,
+        @RequestParam(required = false) whiteCount: Int?,
+        @RequestParam(required = false) roseCount: Int?,
+        @RequestParam(required = false) beerCount: Int?,
+        @RequestParam(required = false) spiritsCount: Int?,
+    ): ShoppingSuggestionsDto {
+        val counts = if (listOf(redCount, sparklingCount, whiteCount, roseCount, beerCount, spiritsCount).any { it != null }) {
+            val d = VinmonopoletService.CategoryCounts.fromPrizeCount(prizeCount)
+            VinmonopoletService.CategoryCounts(
+                red      = redCount      ?: d.red,
+                sparkling = sparklingCount ?: d.sparkling,
+                white    = whiteCount    ?: d.white,
+                rose     = roseCount     ?: d.rose,
+                beer     = beerCount     ?: d.beer,
+                spirits  = spiritsCount  ?: d.spirits
+            )
+        } else null
+        return vinmonopoletService.getSuggestions(prizeCount, budgetPerLottery, lotteryCount, counts)
+    }
 
     // --- Vinmonopolet product lookup ---
 

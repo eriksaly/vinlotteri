@@ -31,6 +31,7 @@ spring:
 
 app:
   bootstrap-admin-email: ${BOOTSTRAP_ADMIN_EMAIL:esa@isys.no}
+  allowed-emails: ${ALLOWED_EMAILS:}
   allowed-origin: ${ALLOWED_ORIGIN:http://localhost:5173}
   vipps-number: ${VIPPS_NUMBER:12345678}
   price-per-ticket: 5

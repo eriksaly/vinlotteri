@@ -17,8 +17,13 @@ import java.time.Instant
 @Service
 class AppUserService(
     private val userRepository: AppUserRepository,
-    @Value("\${app.bootstrap-admin-email:}") private val bootstrapAdminEmail: String
+    @Value("\${app.bootstrap-admin-email:}") private val bootstrapAdminEmail: String,
+    @Value("\${app.allowed-emails:}") private val allowedEmailsRaw: String
 ) : OidcUserService() {
+
+    private val allowedEmails: Set<String> by lazy {
+        allowedEmailsRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+    }
 
     override fun loadUser(userRequest: OidcUserRequest): OidcUser {
         val oidcUser = super.loadUser(userRequest)
@@ -28,7 +33,7 @@ class AppUserService(
                 OAuth2Error("no_email", "Ingen e-post i Google-tokenet", null)
             )
 
-        if (!email.endsWith("@isys.no")) {
+        if (!email.endsWith("@isys.no") && email !in allowedEmails) {
             throw OAuth2AuthenticationException(
                 OAuth2Error("domain_not_allowed", "Bare @isys.no-brukere har tilgang til kjelleren", null)
             )

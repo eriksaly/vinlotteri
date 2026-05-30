@@ -18,10 +18,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS)
 
+type Counts = { red: number; sparkling: number; white: number; rose: number; beer: number; spirits: number }
+
+function defaultCounts(prizeCount: number): Counts {
+  return {
+    red: Math.max(0, prizeCount - 5),
+    sparkling: 1,
+    white: 1,
+    rose: 1,
+    beer: 3,
+    spirits: 1,
+  }
+}
+
 export default function ShoppingTab() {
   const [prizeCount, setPrizeCount] = useState<number | ''>(12)
   const [totalBudget, setTotalBudget] = useState<number | ''>('')
   const [lotteryCount, setLotteryCount] = useState<number | ''>(1)
+  const [counts, setCounts] = useState<Counts>(defaultCounts(12))
   const [suggestions, setSuggestions] = useState<VinmonopoletProduct[] | null>(null)
   const [fetchingProducts, setFetchingProducts] = useState(false)
   const [addingToInventory, setAddingToInventory] = useState(false)
@@ -32,6 +46,12 @@ export default function ShoppingTab() {
     const t = setTimeout(() => setToast(null), 3500)
     return () => clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    if (prizeCount !== '') {
+      setCounts(defaultCounts(Number(prizeCount)))
+    }
+  }, [prizeCount])
 
   const budgetPerLottery = totalBudget !== '' && lotteryCount !== '' && lotteryCount > 0
     ? Math.floor(Number(totalBudget) / Number(lotteryCount))
@@ -48,7 +68,16 @@ export default function ShoppingTab() {
     setFetchingProducts(true)
     setSuggestions(null)
     try {
-      const params = new URLSearchParams({ prizeCount: String(prizeCount || 12), lotteryCount: String(lotteryCount || 1) })
+      const params = new URLSearchParams({
+        prizeCount: String(prizeCount || 12),
+        lotteryCount: String(lotteryCount || 1),
+        redCount: String(counts.red),
+        sparklingCount: String(counts.sparkling),
+        whiteCount: String(counts.white),
+        roseCount: String(counts.rose),
+        beerCount: String(counts.beer),
+        spiritsCount: String(counts.spirits),
+      })
       if (budgetPerLottery != null) params.set('budgetPerLottery', String(budgetPerLottery))
       const r = await api.get<ShoppingSuggestions>(`/api/admin/shopping/suggestions?${params}`)
       setSuggestions(r.data.products)
@@ -94,6 +123,21 @@ export default function ShoppingTab() {
         }, {})
     : {}
 
+  const countInput = (label: string, key: keyof Counts) => (
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <label style={{ fontSize: '0.8rem' }}>{label}</label>
+      <input
+        className="form-control"
+        type="number"
+        min={0}
+        max={50}
+        value={counts[key]}
+        onChange={e => setCounts(c => ({ ...c, [key]: Math.max(0, parseInt(e.target.value) || 0) }))}
+        style={{ width: 64 }}
+      />
+    </div>
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {toast && (
@@ -138,24 +182,50 @@ export default function ShoppingTab() {
               <input
                 className="form-control"
                 type="number"
-                min={5}
+                min={1}
                 max={50}
                 value={prizeCount}
                 onChange={e => setPrizeCount(e.target.value === '' ? '' : Number(e.target.value))}
-                onBlur={e => { const n = parseInt(e.target.value); setPrizeCount(isNaN(n) ? 12 : Math.max(5, n)) }}
+                onBlur={e => { const n = parseInt(e.target.value); setPrizeCount(isNaN(n) ? 12 : Math.max(1, n)) }}
                 style={{ width: 90 }}
               />
             </div>
-            <button className="btn btn-primary" onClick={fetchSuggestions} disabled={fetchingProducts}>
-              {fetchingProducts ? '⏳ Henter produkter...' : '🔍 Finn produkter'}
+          </div>
+
+          <div style={{
+            display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end',
+            padding: '0.75rem 1rem', background: 'var(--bg-subtle, rgba(255,255,255,0.04))',
+            borderRadius: 8, border: '1px solid var(--border)', marginBottom: '1.25rem'
+          }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center', marginRight: '0.25rem' }}>
+              Antall per trekning:
+            </span>
+            {countInput('🍷 Rød', 'red')}
+            {countInput('🥂 Muss.', 'sparkling')}
+            {countInput('🫧 Hvit', 'white')}
+            {countInput('🌸 Rosé', 'rose')}
+            {countInput('🍺 Øl', 'beer')}
+            {countInput('🥃 Sprit', 'spirits')}
+            <button
+              className="btn btn-sm"
+              style={{ alignSelf: 'flex-end' }}
+              onClick={() => setCounts(defaultCounts(Number(prizeCount) || 12))}
+              title="Tilbakestill til standardfordeling"
+            >
+              ↺ Reset
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            {budgetPerLottery != null && (
-              <span>💰 <strong>{budgetPerLottery} kr</strong> per trekning</span>
-            )}
-            <span>Kun på lager i Horten Sjøsiden · fordeling varierer</span>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="btn btn-primary" onClick={fetchSuggestions} disabled={fetchingProducts}>
+              {fetchingProducts ? '⏳ Henter produkter...' : '🔍 Finn produkter'}
+            </button>
+            <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              {budgetPerLottery != null && (
+                <span>💰 <strong>{budgetPerLottery} kr</strong> per trekning</span>
+              )}
+              <span>Kun på lager i Horten Sjøsiden · fordeling varierer</span>
+            </div>
           </div>
         </div>
       </div>
