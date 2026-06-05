@@ -20,7 +20,7 @@ type BuyerTableProps = {
 function BuyerRow({ b, color, isOpen, editingId, editAmount, pricePerTicket, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onEditAmountChange, first }: Omit<BuyerTableProps, 'buyers' | 'prideColors'> & { b: Buyer; color: string; first: boolean }) {
   const td: React.CSSProperties = { borderTop: first ? 'none' : '1px solid var(--border)', verticalAlign: 'middle', padding: '0.15rem 0.3rem' }
   return (
-    <tr style={{ background: editingId === b.participant.id ? 'var(--bg-hover, rgba(0,0,0,0.03))' : 'transparent' }}>
+    <tr style={{ background: `${color}22` }}>
       <td style={{ ...td, paddingLeft: '0.75rem', width: 38 }}>
         <ParticipantAvatar participant={b.participant} size="sm" color={color} />
       </td>
@@ -28,7 +28,7 @@ function BuyerRow({ b, color, isOpen, editingId, editAmount, pricePerTicket, onS
         {b.participant.name}
       </td>
       <td style={{ ...td, textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-        {b.ticketCount} lodd
+        {b.ticketCount} lodd · {b.ticketCount * pricePerTicket} kr
       </td>
       <td style={{ ...td, textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', width: 42 }}>
         {b.ticketPercentage.toFixed(1)}%
