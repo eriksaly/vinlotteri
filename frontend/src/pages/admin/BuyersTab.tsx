@@ -1,7 +1,72 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import type { Buyer, LotteryInfo, Participant } from '../../types'
 import { useConfirm, ParticipantAvatar, ParticipantAutocomplete } from './shared'
+
+type BuyerTableProps = {
+  buyers: Buyer[]
+  prideColors: string[]
+  isOpen: boolean
+  editingId: number | null
+  editAmount: string
+  pricePerTicket: number
+  onStartEdit: (b: Buyer) => void
+  onSaveEdit: (id: number) => void
+  onCancelEdit: () => void
+  onRemove: (id: number) => void
+  onEditAmountChange: (v: string) => void
+}
+
+function BuyerRow({ b, color, isOpen, editingId, editAmount, pricePerTicket, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onEditAmountChange, first }: Omit<BuyerTableProps, 'buyers' | 'prideColors'> & { b: Buyer; color: string; first: boolean }) {
+  const td: React.CSSProperties = { borderTop: first ? 'none' : '1px solid var(--border)', verticalAlign: 'middle', padding: '0.15rem 0.3rem' }
+  return (
+    <tr style={{ background: editingId === b.participant.id ? 'var(--bg-hover, rgba(0,0,0,0.03))' : 'transparent' }}>
+      <td style={{ ...td, paddingLeft: '0.75rem', width: 38 }}>
+        <ParticipantAvatar participant={b.participant} size="sm" color={color} />
+      </td>
+      <td style={{ ...td, fontWeight: 500, fontSize: '0.875rem' }}>
+        {b.participant.name}
+      </td>
+      <td style={{ ...td, textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        {b.ticketCount} lodd
+      </td>
+      <td style={{ ...td, textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', width: 42 }}>
+        {b.ticketPercentage.toFixed(1)}%
+      </td>
+      <td style={{ ...td, paddingRight: '0.75rem', whiteSpace: 'nowrap', width: 1 }}>
+        {editingId === b.participant.id ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <input className="form-control" type="number" min={pricePerTicket} step={pricePerTicket} value={editAmount}
+              onChange={e => onEditAmountChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(b.participant.id); if (e.key === 'Escape') onCancelEdit() }}
+              autoFocus onFocus={e => e.target.select()} style={{ width: 80, padding: '0.2rem 0.4rem', fontSize: '0.85rem' }} />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              kr = {Math.max(1, Math.floor((parseInt(editAmount) || 0) / pricePerTicket))} lodd
+            </span>
+            <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.6rem', fontSize: '0.8rem' }} onClick={() => onSaveEdit(b.participant.id)}>Lagre</button>
+            <button className="btn btn-outline btn-sm" style={{ padding: '0.2rem 0.6rem', fontSize: '0.8rem' }} onClick={onCancelEdit}>Avbryt</button>
+          </div>
+        ) : isOpen ? (
+          <div style={{ display: 'flex', gap: '0.1rem' }}>
+            <button onClick={() => onStartEdit(b)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.2rem 0.3rem', lineHeight: 1 }} title="Rediger">✏️</button>
+            <button onClick={() => onRemove(b.participant.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0.2rem 0.3rem', lineHeight: 1 }} title="Fjern">✕</button>
+          </div>
+        ) : null}
+      </td>
+    </tr>
+  )
+}
+
+function BuyerTable(props: BuyerTableProps) {
+  const { buyers, prideColors, ...rest } = props
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <tbody>
+        {buyers.map((b, i) => <BuyerRow key={b.participant.id} {...rest} b={b} color={prideColors[i % prideColors.length]} first={i === 0} />)}
+      </tbody>
+    </table>
+  )
+}
 
 export default function BuyersTab({ lottery, onLotteryChange }: { lottery: LotteryInfo | null; onLotteryChange: () => Promise<void> }) {
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -78,6 +143,8 @@ export default function BuyersTab({ lottery, onLotteryChange }: { lottery: Lotte
   const totalTickets = buyers.reduce((s, b) => s + b.ticketCount, 0)
   const isOpen = lottery?.status === 'OPEN'
   const buyersWithParticipants = participants.filter(p => !buyers.find(b => b.participant.id === p.id))
+  const prideColors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
+  const sortedBuyers = [...buyers].sort((a, b) => a.participant.tag.localeCompare(b.participant.tag))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -141,69 +208,7 @@ export default function BuyersTab({ lottery, onLotteryChange }: { lottery: Lotte
             Ingen lodd solgt ennå.
           </div>
         ) : (
-          <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
-            {[...buyers].sort((a, b) => a.participant.tag.localeCompare(b.participant.tag)).map(b => (
-              <div key={b.participant.id} style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                padding: '0.6rem 0.8rem', borderRadius: 8,
-                background: 'var(--bg)', border: editingId === b.participant.id ? '1.5px solid var(--wine)' : '1.5px solid var(--border)',
-              }}>
-                <ParticipantAvatar participant={b.participant} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {b.participant.name}
-                  </div>
-                  {editingId === b.participant.id ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem' }}>
-                      <input
-                        className="form-control"
-                        type="number"
-                        min={lottery?.pricePerTicket ?? 5}
-                        step={lottery?.pricePerTicket ?? 5}
-                        value={editAmount}
-                        onChange={e => setEditAmount(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') saveEdit(b.participant.id); if (e.key === 'Escape') cancelEdit() }}
-                        autoFocus
-                        onFocus={e => e.target.select()}
-                        style={{ width: 70, padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        kr = {Math.max(1, Math.floor((parseInt(editAmount) || 0) / (lottery?.pricePerTicket ?? 5)))} lodd
-                      </span>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {b.ticketCount} lodd · {b.ticketCount * (lottery?.pricePerTicket ?? 5)} kr
-                    </div>
-                  )}
-                  {editingId === b.participant.id ? (
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
-                      <button className="btn btn-primary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={() => saveEdit(b.participant.id)}>Lagre</button>
-                      <button className="btn btn-outline btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={cancelEdit}>Avbryt</button>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: '0.3rem', height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{ width: `${b.ticketPercentage}%`, height: '100%', background: 'var(--wine)', borderRadius: 2 }} />
-                    </div>
-                  )}
-                </div>
-                {isOpen && editingId !== b.participant.id && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flexShrink: 0 }}>
-                    <button
-                      onClick={() => startEdit(b)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.2rem', lineHeight: 1 }}
-                      title="Rediger"
-                    >✏️</button>
-                    <button
-                      onClick={() => removeBuyer(b.participant.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0.2rem', lineHeight: 1 }}
-                      title="Fjern"
-                    >✕</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          <BuyerTable buyers={sortedBuyers} prideColors={prideColors} isOpen={isOpen} editingId={editingId} editAmount={editAmount} pricePerTicket={lottery?.pricePerTicket ?? 5} onStartEdit={startEdit} onSaveEdit={saveEdit} onCancelEdit={cancelEdit} onRemove={removeBuyer} onEditAmountChange={setEditAmount} />
         )}
       </div>
       {dialog}

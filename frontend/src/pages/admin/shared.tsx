@@ -28,11 +28,11 @@ export function useConfirm() {
   return { confirm, dialog }
 }
 
-export function ParticipantAvatar({ participant, size, highlight }: { participant: Participant; size?: string; highlight?: boolean }) {
-  const cls = `avatar${size === 'xl' ? ' avatar-xl' : size === 'lg' ? ' avatar-lg' : ''}`
+export function ParticipantAvatar({ participant, size, highlight, color }: { participant: Participant; size?: string; highlight?: boolean; color?: string }) {
+  const cls = `avatar${size === 'xl' ? ' avatar-xl' : size === 'lg' ? ' avatar-lg' : size === 'sm' ? ' avatar-sm' : ''}`
   const inner = participant.hasPhoto
     ? <img src={`/api/participants/${participant.id}/photo`} alt={participant.name} className={cls} />
-    : <div className={cls} style={{ background: tagColor(participant.tag) }}>{participant.tag.toUpperCase()}</div>
+    : <div className={cls} style={{ background: color ?? tagColor(participant.tag) }}>{participant.tag.toUpperCase()}</div>
 
   if (highlight !== undefined) {
     return (
@@ -133,7 +133,7 @@ export function ParticipantAutocomplete({
 }
 
 export function tagColor(tag: string) {
-  const colors = ['#722F37', '#2d4a7a', '#2d7a5a', '#7a4a2d', '#5a2d7a', '#7a2d6a']
+  const colors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
   let hash = 0
   for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]

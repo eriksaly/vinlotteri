@@ -460,7 +460,7 @@ function winesLeftMessage(n: number): string {
 function fireConfetti() {
   playWin()
   const end = Date.now() + 3500
-  const colors = ['#722F37', '#C5A028', '#ffffff', '#9b4a54']
+  const colors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
   const frame = () => {
     confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors, zIndex: CONFETTI_Z })
     confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors, zIndex: CONFETTI_Z })
@@ -471,11 +471,7 @@ function fireConfetti() {
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────
 
-const WHEEL_COLORS = [
-  '#722F37', '#2d4a7a', '#2d7a5a', '#7a4a2d',
-  '#5a2d7a', '#c5a028', '#7a2d6a', '#2d637a',
-  '#7a2d4a', '#3a7a2d', '#6a2d7a', '#2d7a6a',
-]
+const WHEEL_COLORS = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
 
 function getWheelSegments(buyerList: Buyer[]) {
   const total = buyerList.reduce((s, b) => s + b.ticketCount, 0)
