@@ -77,10 +77,16 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
     // Wait two frames for overlay to mount and ResizeObserver to fire
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
 
+    // Pause 2 s so viewers can orient on the wheel before it starts spinning
+    await new Promise(r => setTimeout(r, 2000))
+
     let resolveWinner!: (v: { participantId: number; ticketNumber: number }) => void
     let rejectWinner!: (e: unknown) => void
     const winnerPromise = new Promise<{ participantId: number; ticketNumber: number }>((res, rej) => { resolveWinner = res; rejectWinner = rej })
-    const spinPromise = wheelRef.current?.spin(winnerPromise) ?? Promise.resolve()
+    // Guarantee at least 3 s of fast-spinning before deceleration kicks in
+    const spinPromise = wheelRef.current?.spin(
+      Promise.all([winnerPromise, new Promise<void>(r => setTimeout(r, 3000))]).then(([w]) => w)
+    ) ?? Promise.resolve()
 
     try {
       const result = await api.post<DrawResult>('/api/admin/lottery/draw')
