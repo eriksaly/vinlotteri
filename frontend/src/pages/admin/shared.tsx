@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { Participant, InventoryItem } from '../../types'
 
 export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose?: () => void }) {
@@ -160,8 +161,10 @@ export function InventoryItemPicker({
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
   const [activeChip, setActiveChip] = useState<string | null>(null)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const q = value.trim().toLowerCase()
   const chip = activeChip ? CATEGORY_CHIPS.find(c => c.key === activeChip) ?? null : null
@@ -182,11 +185,28 @@ export function InventoryItemPicker({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (containerRef.current?.contains(target)) return
+      if (dropdownRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const update = () => {
+      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect())
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [open])
 
   const select = (i: InventoryItem) => {
     onSelect(i.id)
@@ -203,6 +223,28 @@ export function InventoryItemPicker({
     else if (e.key === 'Escape') { e.preventDefault(); setOpen(false) }
   }
 
+  const DROPDOWN_W = Math.max(width, 300)
+  const DROPDOWN_MAX_H = 360
+  let dropdownTop = 0
+  let dropdownLeft = 0
+  let openUpward = false
+  if (anchorRect) {
+    const spaceBelow = window.innerHeight - anchorRect.bottom
+    const spaceAbove = anchorRect.top
+    openUpward = spaceBelow < 220 && spaceAbove > spaceBelow
+    dropdownTop = openUpward
+      ? Math.max(8, anchorRect.top - DROPDOWN_MAX_H - 2)
+      : anchorRect.bottom + 2
+    // Prefer right-aligning to the input; clamp into viewport
+    dropdownLeft = Math.min(
+      Math.max(8, anchorRect.right - DROPDOWN_W),
+      window.innerWidth - DROPDOWN_W - 8,
+    )
+  }
+  const maxHeightActual = anchorRect
+    ? Math.min(DROPDOWN_MAX_H, openUpward ? anchorRect.top - 16 : window.innerHeight - anchorRect.bottom - 16)
+    : DROPDOWN_MAX_H
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width }}>
       <input
@@ -217,13 +259,17 @@ export function InventoryItemPicker({
         onKeyDown={handleKey}
         autoComplete="off"
       />
-      {open && (
-        <div style={{
-          position: 'absolute', zIndex: 200, top: 'calc(100% + 2px)', right: 0,
-          width: Math.max(width, 300),
-          background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)', maxHeight: 360, display: 'flex', flexDirection: 'column',
-        }}>
+      {open && anchorRect && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed', zIndex: 1000,
+            top: dropdownTop, left: dropdownLeft, width: DROPDOWN_W,
+            background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.18)', maxHeight: maxHeightActual,
+            display: 'flex', flexDirection: 'column',
+          }}
+        >
           <div
             onMouseDown={e => e.preventDefault()}
             style={{
@@ -251,38 +297,39 @@ export function InventoryItemPicker({
             ))}
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Ingen treff
-            </div>
-          ) : filtered.map((item, i) => (
-            <div
-              key={item.id}
-              onMouseDown={e => { e.preventDefault(); select(item) }}
-              onMouseEnter={() => setHighlighted(i)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.4rem 0.55rem', cursor: 'pointer', fontSize: '0.85rem',
-                background: i === highlighted ? 'rgba(114,47,55,0.10)' : 'transparent',
-                borderBottom: '1px solid var(--border)',
-              }}
-            >
-              <img
-                src={item.imageUrl}
-                alt=""
-                style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }}
-                onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
-              />
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {item.category} · {item.price.toFixed(0)} kr
+            {filtered.length === 0 ? (
+              <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Ingen treff
+              </div>
+            ) : filtered.map((item, i) => (
+              <div
+                key={item.id}
+                onMouseDown={e => { e.preventDefault(); select(item) }}
+                onMouseEnter={() => setHighlighted(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.4rem 0.55rem', cursor: 'pointer', fontSize: '0.85rem',
+                  background: i === highlighted ? 'rgba(114,47,55,0.10)' : 'transparent',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }}
+                  onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
+                />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {item.category} · {item.price.toFixed(0)} kr
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

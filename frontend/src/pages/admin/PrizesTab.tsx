@@ -49,6 +49,8 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
     try {
       const r = await api.put<LotteryPrize>(`/api/admin/lottery/current/prizes/${position}`, { inventoryItemIds: ids })
       setPrizes(prev => prev.map(p => p.position === position ? r.data : p))
+      const inv = await api.get<InventoryItem[]>('/api/admin/inventory')
+      setInventory(inv.data)
     } catch (e: unknown) {
       setToast({ msg: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil', ok: false })
     } finally {
@@ -181,7 +183,6 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
 
   const unassignedCount = prizes.filter(p => p.items.length === 0).length
   const assignedCount = prizes.filter(p => p.items.length > 0).length
-  const assignedItemIds = new Set(prizes.flatMap(p => p.items.map(i => i.id)))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -313,7 +314,7 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                     )}
                     {prize.winnerId == null && (
                       <InventoryItemPicker
-                        items={inventory.filter(inv => !assignedItemIds.has(inv.id) || prize.items.some(i => i.id === inv.id))}
+                        items={inventory}
                         disabled={busy}
                         onSelect={newId => assignItems(prize.position, [...prize.items.map(i => i.id), newId])}
                       />
