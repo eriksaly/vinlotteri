@@ -77,8 +77,8 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
     // Wait two frames for overlay to mount and ResizeObserver to fire
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
 
-    // Pause 2 s so viewers can orient on the wheel before it starts spinning
-    await new Promise(r => setTimeout(r, 2000))
+    // Pause 1 s so viewers can orient on the wheel before it starts spinning
+    await new Promise(r => setTimeout(r, 1000))
 
     let resolveWinner!: (v: { participantId: number; ticketNumber: number }) => void
     let rejectWinner!: (e: unknown) => void
@@ -562,10 +562,10 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
         const snap = buyers.slice()
         const startAngle = angleRef.current
         const t0 = performance.now()
-        const FAST = 0.006
+        // rad/ms — ~2.4 rev/s full-speed cruise
+        const FAST = 0.015
         let phase: 'fast' | 'decel' = 'fast'
-        let decelFrom = 0, decelTarget = 0, decelT0 = 0
-        const DECEL_MS = 8000
+        let decelFrom = 0, decelTarget = 0, decelT0 = 0, decelMs = 0
         const TICK_INTERVAL = Math.PI / 7
         let lastTickAngle = startAngle
         const loop = () => {
@@ -575,9 +575,10 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
           if (phase === 'fast') {
             a = startAngle + FAST * (now - t0)
           } else {
-            const p = Math.min(1, (now - decelT0) / DECEL_MS)
+            const p = Math.min(1, (now - decelT0) / decelMs)
             speed = 1 - p
-            a = decelFrom + (decelTarget - decelFrom) * (1 - Math.pow(1 - p, 3))
+            // Velocity-matched decel: starts at FAST, ends at 0 — seamless from fast phase
+            a = decelFrom + (decelTarget - decelFrom) * (2 * p - p * p)
             if (p >= 1) {
               angleRef.current = decelTarget
               spinningRef.current = false
@@ -602,8 +603,10 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
           const targetAngle = ws.start + fraction * (ws.end - ws.start)
           const base = -Math.PI / 2 - targetAngle
           const cur = angleRef.current
-          const k = Math.ceil((cur + 8 * 2 * Math.PI - base) / (2 * Math.PI))
+          const k = Math.ceil((cur + 12 * 2 * Math.PI - base) / (2 * Math.PI))
           decelFrom = cur; decelTarget = base + k * 2 * Math.PI
+          // Duration derived from FAST so the quadratic decel starts at exactly FAST
+          decelMs = (2 * (decelTarget - decelFrom)) / FAST
           decelT0 = performance.now(); phase = 'decel'
         }).catch(() => {
           cancelAnimationFrame(rafRef.current)
