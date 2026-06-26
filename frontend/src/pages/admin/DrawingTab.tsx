@@ -603,7 +603,7 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, 
           const targetAngle = ws.start + fraction * (ws.end - ws.start)
           const base = -Math.PI / 2 - targetAngle
           const cur = angleRef.current
-          const k = Math.ceil((cur + 12 * 2 * Math.PI - base) / (2 * Math.PI))
+          const k = Math.ceil((cur + 10 * 2 * Math.PI - base) / (2 * Math.PI))
           decelFrom = cur; decelTarget = base + k * 2 * Math.PI
           // Duration derived from FAST so the quadratic decel starts at exactly FAST
           decelMs = (2 * (decelTarget - decelFrom)) / FAST

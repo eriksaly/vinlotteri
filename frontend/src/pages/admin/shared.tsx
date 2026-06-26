@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, ReactNode } from 'react'
-import type { Participant } from '../../types'
+import type { Participant, InventoryItem } from '../../types'
 
 export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose?: () => void }) {
   return (
@@ -128,6 +128,217 @@ export function ParticipantAutocomplete({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// Category buckets for the filter chips. Each chip narrows the list to items
+// whose category matches any of the bucket's category substrings.
+const CATEGORY_CHIPS: { key: string; label: string; categories: string[] }[] = [
+  { key: 'beer',     label: '🍺 Øl',         categories: ['øl', 'ale', 'lager', 'porter', 'stout', 'pils', 'hveteøl', 'surøl', 'ipa'] },
+  { key: 'red',      label: '🍷 Rødvin',     categories: ['rødvin'] },
+  { key: 'white',    label: '🥂 Hvitvin',    categories: ['hvitvin'] },
+  { key: 'rose',     label: '🌸 Rosé',       categories: ['rosévin'] },
+  { key: 'sparkling',label: '🍾 Bobler',     categories: ['musserende', 'champagne'] },
+  { key: 'spirit',   label: '🥃 Sprit',      categories: ['brennevin', 'gin', 'whisky', 'whiskey', 'akevitt', 'druebrennevin', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac', 'likør'] },
+]
+
+export function InventoryItemPicker({
+  items,
+  onSelect,
+  disabled,
+  placeholder = '+ Legg til flaske',
+  width = 240,
+}: {
+  items: InventoryItem[]
+  onSelect: (id: number) => void
+  disabled?: boolean
+  placeholder?: string
+  width?: number
+}) {
+  const [value, setValue] = useState('')
+  const [open, setOpen] = useState(false)
+  const [highlighted, setHighlighted] = useState(0)
+  const [activeChip, setActiveChip] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const q = value.trim().toLowerCase()
+  const chip = activeChip ? CATEGORY_CHIPS.find(c => c.key === activeChip) ?? null : null
+  const filtered = items.filter(i => {
+    if (chip) {
+      const cat = i.category.toLowerCase()
+      if (!chip.categories.some(c => cat.includes(c))) return false
+    }
+    if (q === '') return true
+    return (
+      i.name.toLowerCase().includes(q) ||
+      i.category.toLowerCase().includes(q) ||
+      i.country.toLowerCase().includes(q)
+    )
+  })
+
+  useEffect(() => { setHighlighted(0) }, [value, activeChip])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const select = (i: InventoryItem) => {
+    onSelect(i.id)
+    setValue('')
+    setOpen(false)
+    inputRef.current?.blur()
+  }
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (!open) { if (e.key === 'ArrowDown' || e.key === 'Enter') setOpen(true); return }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(i => Math.min(i + 1, filtered.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[highlighted]) select(filtered[highlighted]) }
+    else if (e.key === 'Escape') { e.preventDefault(); setOpen(false) }
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width }}>
+      <input
+        ref={inputRef}
+        className="form-control"
+        style={{ fontSize: '0.8rem', padding: '0.25rem 0.45rem', width: '100%' }}
+        placeholder={placeholder}
+        value={value}
+        disabled={disabled}
+        onChange={e => { setValue(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKey}
+        autoComplete="off"
+      />
+      {open && (
+        <div style={{
+          position: 'absolute', zIndex: 200, top: 'calc(100% + 2px)', right: 0,
+          width: Math.max(width, 300),
+          background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.18)', maxHeight: 360, display: 'flex', flexDirection: 'column',
+        }}>
+          <div
+            onMouseDown={e => e.preventDefault()}
+            style={{
+              display: 'flex', flexWrap: 'wrap', gap: 4,
+              padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)',
+              background: 'var(--bg)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveChip(null)}
+              style={chipStyle(activeChip === null)}
+            >
+              Alle
+            </button>
+            {CATEGORY_CHIPS.map(c => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setActiveChip(activeChip === c.key ? null : c.key)}
+                style={chipStyle(activeChip === c.key)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Ingen treff
+            </div>
+          ) : filtered.map((item, i) => (
+            <div
+              key={item.id}
+              onMouseDown={e => { e.preventDefault(); select(item) }}
+              onMouseEnter={() => setHighlighted(i)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.4rem 0.55rem', cursor: 'pointer', fontSize: '0.85rem',
+                background: i === highlighted ? 'rgba(114,47,55,0.10)' : 'transparent',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <img
+                src={item.imageUrl}
+                alt=""
+                style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }}
+                onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {item.category} · {item.price.toFixed(0)} kr
+                </div>
+              </div>
+            </div>
+          ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function chipStyle(active: boolean): React.CSSProperties {
+  return {
+    fontSize: '0.72rem', fontWeight: 500,
+    padding: '0.18rem 0.55rem', borderRadius: 999,
+    border: `1px solid ${active ? 'var(--wine)' : 'var(--border)'}`,
+    background: active ? 'var(--wine)' : 'var(--bg-card)',
+    color: active ? 'white' : 'var(--text)',
+    cursor: 'pointer', whiteSpace: 'nowrap',
+    lineHeight: 1.4,
+  }
+}
+
+export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '2rem', cursor: 'zoom-out',
+      }}
+    >
+      <img
+        src={src}
+        alt={alt ?? ''}
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: '92vw', maxHeight: '92vh', objectFit: 'contain',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.5)', background: 'white', borderRadius: 8,
+          cursor: 'default',
+        }}
+      />
+      <button
+        onClick={onClose}
+        aria-label="Lukk"
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          width: 40, height: 40, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.15)', color: 'white',
+          border: 'none', cursor: 'pointer', fontSize: '1.3rem',
+        }}
+      >
+        ✕
+      </button>
     </div>
   )
 }

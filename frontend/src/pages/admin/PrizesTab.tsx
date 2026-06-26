@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import type { LotteryInfo, LotteryPrize, InventoryItem } from '../../types'
+import { InventoryItemPicker, ImageLightbox } from './shared'
 
 
 export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) {
@@ -10,6 +11,7 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
   const [saving, setSaving] = useState(false)
   const [assigningPos, setAssigningPos] = useState<number | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
 
   useEffect(() => {
     if (!toast) return
@@ -261,7 +263,9 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                     {prize.items.length > 0 ? prize.items.map(item => (
                       <img key={item.id} src={item.imageUrl} alt={item.name}
-                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4 }}
+                        onClick={() => setLightbox({ src: item.imageUrl, alt: item.name })}
+                        title="Klikk for å forstørre"
+                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, cursor: 'zoom-in' }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                     )) : (
                       <div style={{ width: 40, height: 40, background: 'var(--surface-raised)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>?</div>
@@ -308,23 +312,11 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                       <span className="badge">Mangler flaske</span>
                     )}
                     {prize.winnerId == null && (
-                      <select className="form-control" style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: 200 }}
-                        value="" disabled={busy}
-                        onChange={e => {
-                          if (!e.target.value) return
-                          const newId = Number(e.target.value)
-                          assignItems(prize.position, [...prize.items.map(i => i.id), newId])
-                          e.target.value = ''
-                        }}>
-                        <option value="">+ Legg til flaske</option>
-                        {inventory
-                          .filter(inv => !assignedItemIds.has(inv.id) || prize.items.some(i => i.id === inv.id))
-                          .map(inv => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.name} ({inv.category}, {inv.price.toFixed(0)} kr)
-                            </option>
-                          ))}
-                      </select>
+                      <InventoryItemPicker
+                        items={inventory.filter(inv => !assignedItemIds.has(inv.id) || prize.items.some(i => i.id === inv.id))}
+                        disabled={busy}
+                        onSelect={newId => assignItems(prize.position, [...prize.items.map(i => i.id), newId])}
+                      />
                     )}
                   </div>
                 </div>
@@ -340,6 +332,10 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
             Ingen premieplasser konfigurert. Sett antall premier over for å starte.
           </div>
         </div>
+      )}
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
     </div>
   )
