@@ -13,14 +13,14 @@ export default function NavBar() {
   return (
     <nav className="nav">
       <div className="nav-inner">
-        <span className="nav-brand">🍷 Vinlotteri</span>
+        <span className="nav-brand"><span className="palm-sway">🌴</span> Vinlotteri <span className="beach-bob">🍹</span></span>
         <div className="nav-links">
-          <Link to="/" className="nav-link">Forside</Link>
-          <Link to="/statistikk" className="nav-link">🏆 Hall of Vino</Link>
+          <Link to="/" className="nav-link">🏖️ Strandbaren</Link>
+          <Link to="/statistikk" className="nav-link">🏆 Hall of Rosé</Link>
           {user?.role === 'ADMIN' && (
-            <Link to="/admin/dashboard" className="btn btn-gold btn-sm">🗝️ Kjellermester</Link>
+            <Link to="/admin/dashboard" className="btn btn-gold btn-sm">🕶️ Strandsjefen</Link>
           )}
-          <button onClick={logout} className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}>🚪 Logg ut</button>
+          <button onClick={logout} className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.6)' }}>👋 Ha det</button>
         </div>
       </div>
     </nav>

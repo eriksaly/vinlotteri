@@ -28,9 +28,13 @@ export default function StatisticsPage() {
 
       <div className="page-header">
         <div className="container">
-          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🏆</div>
-          <h1 className="page-title">Hall of Vino</h1>
-          <p className="page-subtitle">Her måles flaks i flasker.</p>
+          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>
+            <span className="beach-bob">🏆</span>
+            <span style={{ margin: '0 0.4rem' }}>🌞</span>
+            <span className="palm-sway">🌴</span>
+          </div>
+          <h1 className="page-title">Hall of Rosé</h1>
+          <p className="page-subtitle">Her måles flaks i flasker og solskinn i statistikk. 🍹</p>
         </div>
       </div>
 
@@ -39,15 +43,15 @@ export default function StatisticsPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <div className="spinner" />
-              <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Henter skjendigheter fra arkivet...</p>
+              <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Henter historier fra strandarkivet... 📚🌊</p>
             </div>
           ) : !stats || stats.totalLotteries === 0 ? (
             <div className="card" style={{ maxWidth: 480, margin: '0 auto' }}>
               <div className="card-body" style={{ textAlign: 'center', padding: '2.5rem' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🕰️</div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Arkivet støver</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Ingen avsluttede lotterier ennå. Historien skrives én flaske om gangen.</p>
-                <Link to="/"><button className="btn btn-outline" style={{ marginTop: '1rem' }}>← Tilbake til kjellerdøra</button></Link>
+                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}><span className="beach-bob">🏖️</span></div>
+                <h3 style={{ marginBottom: '0.5rem' }}>Strandarkivet er tomt</h3>
+                <p style={{ color: 'var(--text-muted)' }}>Ingen avsluttede lotterier ennå. Historien skrives én flaske og én solstråle om gangen.</p>
+                <Link to="/"><button className="btn btn-outline" style={{ marginTop: '1rem' }}>← Tilbake til strandbaren</button></Link>
               </div>
             </div>
           ) : (
@@ -55,9 +59,9 @@ export default function StatisticsPage() {
 
               {/* Header summary */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
-                <StatCard emoji="🍾" label="Lotterier avholdt" value={stats.totalLotteries.toString()} />
-                <StatCard emoji="🧑‍🤝‍🧑" label="Ivrige loddkjøpere" value={stats.totalParticipants.toString()} />
-                <StatCard emoji="🎟️" label="Lodd kjøpt totalt" value={lotteries.reduce((s, l) => s + l.totalTickets, 0).toString()} />
+                <StatCard emoji="🍾" label="Strandfester avholdt" value={stats.totalLotteries.toString()} />
+                <StatCard emoji="🕶️" label="Solbriller på jakt etter flaks" value={stats.totalParticipants.toString()} />
+                <StatCard emoji="🎟️" label="Lodd kastet i sanden" value={lotteries.reduce((s, l) => s + l.totalTickets, 0).toString()} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
@@ -65,8 +69,8 @@ export default function StatisticsPage() {
                 {/* Top 5 heldigste */}
                 {stats.topLucky.length > 0 && (
                   <div className="card">
-                    <div className="card-header" style={{ background: 'var(--gold)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      🍀 Topp gullhår
+                    <div className="card-header" style={{ background: 'var(--sunny-gradient)', color: '#4a2c00', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      🌞 Solkyssede vinnere
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
@@ -82,7 +86,7 @@ export default function StatisticsPage() {
                                   <MiniAvatar participant={p} />
                                   <div>
                                     <span style={{ fontWeight: 600 }}>{p.name}</span>
-                                    {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Universets yndling</div>}
+                                    {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Solens yndling</div>}
                                   </div>
                                 </div>
                               </td>
@@ -105,8 +109,8 @@ export default function StatisticsPage() {
                 {/* Top 5 uheldigste */}
                 {stats.topUnlucky.length > 0 && (
                   <div className="card">
-                    <div className="card-header" style={{ background: '#4a4a5a', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      😢 Loddenes fiender
+                    <div className="card-header" style={{ background: 'var(--ocean-gradient)', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      🌧️ Skyer over solsenga
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
@@ -146,7 +150,7 @@ export default function StatisticsPage() {
               {/* Top ticket buyers */}
               <div className="card">
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  🎟️ Loddenes store finansiører
+                  💸 Strandbarens beste kunder
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="table">
@@ -199,7 +203,7 @@ export default function StatisticsPage() {
               {lotteries.length > 0 && (
                 <div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--wine)' }}>
-                    🍾 Trekkingsarkiv
+                    🍾 Strandfest-arkivet
                   </h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {lotteries.map(lottery => (
@@ -299,7 +303,7 @@ export default function StatisticsPage() {
               )}
 
               <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                🍷 Ingen viner ble skadet i produksjonen av denne statistikken 🍷
+                🌴 Ingen paraply-drinker ble skadet i produksjonen av denne statistikken 🍹
               </div>
 
             </div>
@@ -307,9 +311,9 @@ export default function StatisticsPage() {
         </div>
       </div>
       <footer style={{ textAlign: 'center', padding: '2rem 1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem', borderTop: '1px solid var(--border)', marginTop: '1rem' }}>
-        🔒 Dette lotteriet er et internt kontorarrangement forbeholdt ansatte i Integrasjonssystmer AS.<br />
+        🏖️ Dette lotteriet er et internt strandarrangement forbeholdt ansatte i Integrasjonssystemer AS.<br />
         Deltakelse er frivillig. Organisert i henhold til norsk lotteriveiledning for lukkede kretser.<br />
-        Ikke åpent for offentligheten.
+        Ikke åpent for turister som havnet på feil brygge. 🌊
       </footer>
     </div>
   )
@@ -320,18 +324,18 @@ function StreakCard({ streaks, type }: { streaks: Streak[]; type: 'win' | 'lose'
   const streak = streaks[0].streak
   return (
     <div className="card">
-      <div className="card-header" style={{ background: isWin ? 'var(--wine)' : '#4a4a5a', color: 'white' }}>
-        {isWin ? '🔥 Ustoppelig vinmaskin' : '🌧️ Kjellerdøra nekter å åpne seg'}
+      <div className="card-header" style={{ background: isWin ? 'var(--sunset-gradient)' : 'var(--ocean-gradient)', color: 'white' }}>
+        {isWin ? '🔥 Ustoppelig sommerflaks' : '🌊 Bølgene tar bare skum, ingen vin'}
       </div>
       <div style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '0.1em', padding: '0.75rem 1.25rem 0' }}>
         {isWin
-          ? Array(streak).fill('🍷').join('')
-          : <span style={{ color: 'var(--danger)' }}>{Array(streak).fill('✕').join('')}</span>}
+          ? Array(streak).fill('🍹').join('')
+          : <span style={{ color: 'var(--danger)' }}>{Array(streak).fill('🌊').join('')}</span>}
       </div>
       <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0.25rem 1.25rem 0.5rem' }}>
         {isWin
-          ? `${streak} trekkinger på rad. Flaks eller verdig?`
-          : `${streak} trekkinger på rad uten en eneste flaske.`}
+          ? `${streak} trekkinger på rad. Solguden smiler.`
+          : `${streak} trekkinger på rad uten en eneste flaske. Sola gjemmer seg.`}
       </div>
       {streaks.map(s => (
         <div key={s.participantId} className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>

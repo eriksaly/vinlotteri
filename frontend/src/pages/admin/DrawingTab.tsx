@@ -21,6 +21,9 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
   const [toast, setToast] = useState<string | null>(null)
   const { confirm, dialog } = useConfirm()
   const wheelRef = useRef<WheelHandle>(null)
+  // Persist the wheel's rotation across inline↔fullscreen remounts so it doesn't
+  // jump to a random angle when the fullscreen overlay closes.
+  const wheelAngleRef = useRef<number>(Math.random() * Math.PI * 2)
 
   useEffect(() => {
     if (!toast) return
@@ -142,15 +145,15 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center', padding: '2rem' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-              Det er solgt <strong>{totalTickets} lodd</strong>. Når du starter trekning, stenges loddsalget.
+              Det er solgt <strong>{totalTickets} lodd</strong>. Når du starter trekning, stenges strandbaren for nye kunder.
             </p>
             {!showStartForm ? (
               <button className="btn btn-primary btn-xl" onClick={() => setShowStartForm(true)} disabled={totalTickets === 0}>
-                🎬 Start trekning
+                🌅 Start sommertrekninga
               </button>
             ) : (
               <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '1.5rem 2rem', border: '2px solid var(--wine)' }}>
-                <div style={{ fontWeight: 700, fontSize: '1rem' }}>🍾 Hvor mange viner er i kjelleren?</div>
+                <div style={{ fontWeight: 700, fontSize: '1rem' }}>🍹 Hvor mange flasker skal serveres?</div>
                 <div className="qty-control" style={{ gap: '1rem' }}>
                   <button className="qty-btn" style={{ width: 40, height: 40, fontSize: '1.3rem' }} onClick={() => setWineCount(q => Math.max(1, q - 1))}>−</button>
                   <span style={{ fontWeight: 800, fontSize: '2rem', minWidth: '2.5rem', textAlign: 'center', color: 'var(--wine)' }}>{wineCount}</span>
@@ -158,7 +161,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <button className="btn btn-outline" onClick={() => setShowStartForm(false)}>Avbryt</button>
-                  <button className="btn btn-primary btn-lg" onClick={startDrawing}>La oss finne vinerne!</button>
+                  <button className="btn btn-primary btn-lg" onClick={startDrawing}>La oss finne sommerens vinnere! 🌴</button>
                 </div>
               </div>
             )}
@@ -172,15 +175,22 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
             {/* Spinning wheel stage */}
             <div className="card" style={{ overflow: 'hidden', flex: '1 1 340px' }}>
               <div style={{
-                background: 'linear-gradient(135deg, var(--wine-dark) 0%, var(--wine) 100%)',
+                background: 'var(--sunset-gradient)',
                 padding: '2rem',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '1.2rem',
+                position: 'relative',
               }}>
+                <div aria-hidden style={{
+                  position: 'absolute', top: -60, right: -60, width: 220, height: 220,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(255,223,61,0.7) 0%, rgba(255,167,84,0) 70%)',
+                  pointerEvents: 'none',
+                }} />
                 <div style={{ width: 520, height: 520, maxWidth: '100%', aspectRatio: '1' }}>
-                  {!showWheel && <SpinningWheel ref={wheelRef} buyers={buyers} />}
+                  {!showWheel && <SpinningWheel ref={wheelRef} buyers={buyers} angleRef={wheelAngleRef} />}
                 </div>
 
                 {latestWinner && phase === 'idle' && (
@@ -189,7 +199,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                     <div style={{ color: '#c5c5c5', fontSize: '0.7rem', marginTop: '0.2rem' }}>
                       {latestWinner.participantName}
                     </div>
-                    <div style={{ color: '#e8c84a', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                    <div style={{ color: '#ffd54f', fontSize: '0.9rem', marginTop: '0.25rem' }}>
                       🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
                     </div>
                   </div>
@@ -233,7 +243,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                     onClick={drawWinner}
                     disabled={phase === 'spinning' || allDrawn}
                   >
-                    {phase === 'spinning' ? '🎰 Skjebnen avgjøres...' : allDrawn ? '🏁 Kjelleren er tom!' : '🎰 Trekk vin'}
+                    {phase === 'spinning' ? '🌊 Bølgen ruller...' : allDrawn ? '🏖️ Strandbaren er tom!' : '🍹 Trekk en flaske'}
                   </button>
                   {lottery?.wineCount != null && winners.length < lottery.wineCount && phase !== 'spinning' && (
                     <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem' }}>
@@ -293,10 +303,29 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
               }}
               style={{
                 position: 'fixed', inset: 0, zIndex: OVERLAY_Z,
-                background: 'linear-gradient(135deg, #1a0a0d 0%, #2a1215 30%, #1a0a0d 100%)',
+                background: 'linear-gradient(180deg, #0a1e40 0%, #2c1657 30%, #7d3c98 55%, #e8497a 80%, #ff9a44 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: phase === 'spinning' ? 'default' : 'pointer',
+                overflow: 'hidden',
               }}>
+              {/* Tropical dusk decorations */}
+              <div aria-hidden style={{
+                position: 'absolute', top: '-10vh', right: '-8vh',
+                width: '55vh', height: '55vh', borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,223,61,0.55) 0%, rgba(255,167,84,0.2) 45%, rgba(255,167,84,0) 70%)',
+                pointerEvents: 'none',
+              }} />
+              <div aria-hidden style={{
+                position: 'absolute', bottom: '2vh', left: '1.5vh',
+                fontSize: 'min(18vh, 220px)', opacity: 0.35, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+                pointerEvents: 'none', lineHeight: 1, transform: 'rotate(-8deg)',
+              }} className="palm-sway">🌴</div>
+              <div aria-hidden style={{
+                position: 'absolute', bottom: '2vh', right: '1.5vh',
+                fontSize: 'min(18vh, 220px)', opacity: 0.35, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+                pointerEvents: 'none', lineHeight: 1, transform: 'rotate(8deg) scaleX(-1)',
+                animationDelay: '0.7s',
+              }} className="palm-sway">🌴</div>
               {/* Close button */}
               {phase !== 'spinning' && (
                 <button
@@ -317,7 +346,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                   opacity: phase === 'winner' ? 0.15 : 1,
                   transition: 'opacity 0.6s',
                 }}>
-                  <SpinningWheel ref={wheelRef} buyers={buyers} />
+                  <SpinningWheel ref={wheelRef} buyers={buyers} angleRef={wheelAngleRef} />
                 </div>
 
                 {/* Bottles remaining */}
@@ -395,13 +424,13 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'min(4vw, 4vh)', marginTop: '0.5rem' }}>
                       {latestWinner.participantName}
                     </div>
-                    <div style={{ color: '#e8c84a', fontSize: 'min(5vw, 5vh)', marginTop: '0.6rem', fontWeight: 600 }}>
+                    <div style={{ color: '#ffd54f', fontSize: 'min(5vw, 5vh)', marginTop: '0.6rem', fontWeight: 600 }}>
                       🎟️ Lodd #{latestWinner.ticketNumber} · Gevinst #{latestWinner.position}
                     </div>
                   </div>
                   {!allDrawn && (
-                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 'min(2.5vw, 1rem)', marginTop: '3rem' }}>
-                      Klikk for å avdekke neste premie →
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 'min(2.5vw, 1rem)', marginTop: '3rem' }}>
+                      Klikk for å avdekke neste flaske 🍹 →
                     </div>
                   )}
                 </div>
@@ -433,8 +462,8 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                   </>) : (
                     <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 'min(4vw, 1.4rem)' }}>Premie ikke tildelt</div>
                   )}
-                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 'min(2.5vw, 1rem)', marginTop: '0.5rem' }}>
-                    Klikk for å spinne 🎰
+                  <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 'min(2.5vw, 1rem)', marginTop: '0.5rem' }}>
+                    Klikk for å rulle bølgen 🌊
                   </div>
                 </div>
               )}
@@ -456,28 +485,30 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
 }
 
 function winesLeftMessage(n: number): string {
-  if (n === 1) return '🚨 Siste flaske i kjelleren!'
-  if (n === 2) return '😬 Kun 2 flasker igjen uten eier...'
-  if (n === 3) return '🍾 3 flasker venter spent på skjebnen'
-  if (n <= 5) return `🍷 ${n} flasker holder pusten`
-  return `🍾 ${n} flasker lurer på hvem som er heldig`
+  if (n === 1) return '🚨 Siste flaske på strandbaren!'
+  if (n === 2) return '😬 Kun 2 flasker igjen i solskinnet...'
+  if (n === 3) return '🍹 3 flasker svalner i isbua'
+  if (n <= 5) return `🌴 ${n} flasker på solsenga`
+  return `☀️ ${n} flasker glimter i sola`
 }
 
 function fireConfetti() {
   playWin()
   const end = Date.now() + 3500
-  const colors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
+  const colors = ['#ff7a59', '#ffb347', '#12c2c2', '#ffd54f', '#e8497a', '#7ec8ff', '#a4d65e', '#ff4778']
   const frame = () => {
-    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors, zIndex: CONFETTI_Z })
-    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors, zIndex: CONFETTI_Z })
+    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors, zIndex: CONFETTI_Z, scalar: 1.1 })
+    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors, zIndex: CONFETTI_Z, scalar: 1.1 })
     if (Date.now() < end) requestAnimationFrame(frame)
   }
   frame()
+  // Opening tropical burst from centre — bigger, wider
+  confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 }, colors, zIndex: CONFETTI_Z, scalar: 1.2, ticks: 200 })
 }
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────
 
-const WHEEL_COLORS = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
+const WHEEL_COLORS = ['#ff7a59', '#ffb347', '#12c2c2', '#ffd54f', '#e8497a', '#7ec8ff', '#a4d65e']
 
 function getWheelSegments(buyerList: Buyer[]) {
   const total = buyerList.reduce((s, b) => s + b.ticketCount, 0)
@@ -530,17 +561,16 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
   ctx.beginPath()
   ctx.moveTo(cx, cy - r + 2)
   ctx.lineTo(cx - pw, cy - r - ph); ctx.lineTo(cx + pw, cy - r - ph)
-  ctx.closePath(); ctx.fillStyle = '#C5A028'; ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke()
+  ctx.closePath(); ctx.fillStyle = '#ffd54f'; ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke()
 }
 
 interface WheelHandle {
   spin: (winnerPromise: Promise<{ participantId: number; ticketNumber: number }>) => Promise<void>
 }
 
-const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[] }>(({ buyers }, ref) => {
+const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[]; angleRef: React.MutableRefObject<number> }>(({ buyers, angleRef }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
-  const angleRef = useRef(Math.random() * Math.PI * 2)
   const spinningRef = useRef(false)
   // Once a spin has happened, suppress external redraws until the next spin
   // starts (which picks up the new buyers via snap = buyers.slice()).
