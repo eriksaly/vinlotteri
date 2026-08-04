@@ -52,20 +52,20 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ background: 'linear-gradient(135deg, #b8285c 0%, #7d3c98 100%)', color: 'white', padding: '1rem 0' }}>
+      <div style={{ background: 'var(--wine-dark)', color: 'white', padding: '1rem 0' }}>
         <div className="container" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          {loading ? <span>Henter parasollen...</span> : lottery ? (
+          {loading ? <span>Laster...</span> : lottery ? (
             <>
               <span style={{ fontWeight: 700 }}>{lottery.name}</span>
               <StatusBadge status={lottery.status} />
-              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
-                🎟️ {lottery.totalTickets} lodd solgt
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
+                {lottery.totalTickets} lodd solgt
               </span>
             </>
           ) : (
             <>
-              <span style={{ color: 'rgba(255,255,255,0.85)' }}>🏖️ Strandbaren tar sommerferie... ingen aktivt lotteri</span>
-              <button className="btn btn-gold btn-sm" onClick={createLottery}>🍹 Åpne strandbaren</button>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>😴 Kjelleren støver ned... ingen aktiv lotteri</span>
+              <button className="btn btn-gold btn-sm" onClick={createLottery}>🍾 Klargjør lotteri</button>
             </>
           )}
         </div>

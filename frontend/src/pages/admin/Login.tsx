@@ -21,23 +21,13 @@ export default function Login() {
     : null
 
   return (
-    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--sunset-gradient)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{
-        position: 'absolute', top: '-140px', right: '-100px',
-        width: 380, height: 380, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,223,61,0.75) 0%, rgba(255,167,84,0) 70%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 1rem', position: 'relative' }}>
+    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--wine)' }}>
+      <div style={{ width: '100%', maxWidth: 400, padding: '0 1rem' }}>
         <div style={{ textAlign: 'center', color: 'white', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>
-            <span className="palm-sway">🌴</span>
-            <span className="beach-bob" style={{ margin: '0 0.4rem' }}>🍹</span>
-            <span className="palm-sway" style={{ animationDelay: '0.6s' }}>🌴</span>
-          </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, textShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>Velkommen til strandbaren</h1>
-          <p style={{ opacity: 0.9, fontSize: '0.9rem', marginTop: '0.4rem' }}>
-            Solbriller på — vi sjekker gjestelista
+          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🗝️</div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Velkommen til kjelleren</h1>
+          <p style={{ opacity: 0.75, fontSize: '0.9rem', marginTop: '0.4rem' }}>
+            Kun verdige slipper inn
           </p>
         </div>
         <div className="card">
@@ -48,7 +38,7 @@ export default function Login() {
               </div>
             )}
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Logg inn med Google-kontoen din, så finner vi solsenga di. 🏖️
+              Logg inn med din Google-konto for å få adgang til kjelleren.
             </p>
             <a
               href="/oauth2/authorization/google"
