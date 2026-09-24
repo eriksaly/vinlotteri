@@ -21,7 +21,6 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
     open-in-view: false
   servlet:
@@ -38,3 +37,7 @@ app:
 
 server:
   port: ${PORT:8080}
+  tomcat:
+    threads:
+      max: 25
+      min-spare: 5
