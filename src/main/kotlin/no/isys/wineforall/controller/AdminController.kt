@@ -68,6 +68,9 @@ class AdminController(
         return lotteryService.updateParticipantPhoto(id, file.bytes, file.contentType!!)
     }
 
+    @DeleteMapping("/participants/{id}/photo")
+    fun deletePhoto(@PathVariable id: Long): ParticipantDto = lotteryService.deleteParticipantPhoto(id)
+
     // --- Lottery management ---
 
     @PostMapping("/lottery")

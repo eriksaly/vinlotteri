@@ -169,6 +169,13 @@ class LotteryService(
         return participantRepo.save(participant).toDto()
     }
 
+    fun deleteParticipantPhoto(id: Long): ParticipantDto {
+        val participant = participantRepo.findById(id).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        participant.photoData = null
+        participant.photoContentType = null
+        return participantRepo.save(participant).toDto()
+    }
+
     fun getParticipantPhoto(id: Long): Pair<ByteArray, String>? {
         val participant = participantRepo.findById(id).orElse(null) ?: return null
         val data = participant.photoData ?: return null

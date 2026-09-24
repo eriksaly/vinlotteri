@@ -128,6 +128,10 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
   const isDrawing = lottery?.status === 'DRAWING'
   const totalTickets = buyers.reduce((s, b) => s + b.ticketCount, 0)
   const allDrawn = winners.length >= (lottery?.wineCount ?? 999)
+  // The winner's photo is one of only two places a participant photo is shown
+  // (the other is the Vinfolket tab).
+  const winnerHasPhoto = latestWinner != null
+    && buyers.some(b => b.participant.id === latestWinner.participantId && b.participant.hasPhoto)
   const nextPrizePosition = winners.length + 1
   const nextPrize = prizes.find(p => p.position === nextPrizePosition) ?? null
 
@@ -392,6 +396,18 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                 }}>
                   <div style={{ color: 'white', textAlign: 'center', animation: 'modal-in 0.4s ease-out' }}>
+                    {winnerHasPhoto && (
+                      <img
+                        src={`/api/participants/${latestWinner.participantId}/photo`}
+                        alt={latestWinner.participantName}
+                        style={{
+                          width: 'min(30vw, 30vh)', height: 'min(30vw, 30vh)', objectFit: 'cover',
+                          borderRadius: '50%', border: '6px solid var(--gold)',
+                          boxShadow: '0 0 60px rgba(197,160,40,0.7)', marginBottom: '1rem',
+                        }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    )}
                     <div style={{ fontSize: 'min(16vw, 16vh)', fontWeight: 800, lineHeight: 1.1 }}>
                       🏆 {latestWinner.participantTag}
                     </div>

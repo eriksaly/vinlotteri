@@ -47,6 +47,9 @@ class SecurityConfig(
                         "/error"
                     ).permitAll()
                     .requestMatchers("/api/auth/**").authenticated()
+                    // Participant photos are only rendered on the admin Vinfolket tab
+                    // and in the winner announcement, so keep the bytes admin-only.
+                    .requestMatchers("/api/participants/*/photo").hasRole("ADMIN")
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()

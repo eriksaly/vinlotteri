@@ -29,9 +29,12 @@ export function useConfirm() {
   return { confirm, dialog }
 }
 
-export function ParticipantAvatar({ participant, size, highlight, color }: { participant: Participant; size?: string; highlight?: boolean; color?: string }) {
+// Participant photos are private: they only render where `showPhoto` is passed
+// explicitly (the Vinfolket tab and the winner announcement). Everywhere else
+// the participant is shown as a tag-coloured initials badge.
+export function ParticipantAvatar({ participant, size, highlight, color, showPhoto }: { participant: Participant; size?: string; highlight?: boolean; color?: string; showPhoto?: boolean }) {
   const cls = `avatar${size === 'xl' ? ' avatar-xl' : size === 'lg' ? ' avatar-lg' : size === 'sm' ? ' avatar-sm' : ''}`
-  const inner = participant.hasPhoto
+  const inner = showPhoto && participant.hasPhoto
     ? <img src={`/api/participants/${participant.id}/photo`} alt={participant.name} className={cls} />
     : <div className={cls} style={{ background: color ?? tagColor(participant.tag) }}>{participant.tag.toUpperCase()}</div>
 

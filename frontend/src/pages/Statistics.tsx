@@ -79,7 +79,6 @@ export default function StatisticsPage() {
                               <td><MedalBadge rank={i} /></td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                  <MiniAvatar participant={p} />
                                   <div>
                                     <span style={{ fontWeight: 600 }}>{p.name}</span>
                                     {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Universets yndling</div>}
@@ -121,7 +120,6 @@ export default function StatisticsPage() {
                               </td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                  <MiniAvatar participant={p} />
                                   <span style={{ fontWeight: 600 }}>{p.name}</span>
                                 </div>
                               </td>
@@ -159,7 +157,6 @@ export default function StatisticsPage() {
                           <td><MedalBadge rank={i} /></td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <MiniAvatar participant={p} />
                               <span style={{ fontWeight: 600 }}>{p.name}</span>
                             </div>
                           </td>
@@ -243,21 +240,17 @@ export default function StatisticsPage() {
                                 Vinnere
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {lottery.winners.map(w => {
-                                  const p = lottery.participants.find(p => p.participantId === w.participantId)
-                                  return (
-                                    <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                      <span style={{ fontWeight: 800, color: 'var(--wine)', minWidth: '1.5rem', fontSize: '1.1rem' }}>
-                                        {`#${w.position}`}
-                                      </span>
-                                      {p && <MiniAvatar participant={p} />}
-                                      <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
-                                      <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                        lodd #{w.ticketNumber}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
+                                {lottery.winners.map(w => (
+                                  <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <span style={{ fontWeight: 800, color: 'var(--wine)', minWidth: '1.5rem', fontSize: '1.1rem' }}>
+                                      {`#${w.position}`}
+                                    </span>
+                                    <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                      lodd #{w.ticketNumber}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
 
@@ -272,7 +265,6 @@ export default function StatisticsPage() {
                                     <tr key={p.participantId}>
                                       <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                          <MiniAvatar participant={p} />
                                           <span style={{ fontWeight: 600 }}>{p.name}</span>
                                         </div>
                                       </td>
@@ -335,7 +327,6 @@ function StreakCard({ streaks, type }: { streaks: Streak[]; type: 'win' | 'lose'
       </div>
       {streaks.map(s => (
         <div key={s.participantId} className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-          <MiniAvatar participant={s} size="lg" />
           <div>
             <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.name}</div>
             <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{s.lotteriesParticipated} totalt deltatt</div>
@@ -351,13 +342,6 @@ function MedalBadge({ rank }: { rank: number }) {
   if (rank === 1) return <span style={{ fontSize: '1.1rem' }}>🥈</span>
   if (rank === 2) return <span style={{ fontSize: '1.1rem' }}>🥉</span>
   return <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.85rem' }}>#{rank + 1}</span>
-}
-
-function MiniAvatar({ participant, size }: { participant: { participantId?: number; id?: number; tag: string; hasPhoto: boolean }; size?: string }) {
-  const id = participant.participantId ?? participant.id
-  const cls = `avatar${size === 'lg' ? ' avatar-lg' : ''}`
-  if (!participant.hasPhoto || !id) return null
-  return <img src={`/api/participants/${id}/photo`} alt={participant.tag} className={cls} />
 }
 
 function StatCard({ emoji, label, value, sub }: { emoji: string; label: string; value: string; sub?: string }) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../../api/client'
 import type { Participant } from '../../types'
-import { ParticipantAvatar } from './shared'
+import { ParticipantAvatar, useConfirm } from './shared'
 
 export default function ParticipantsTab() {
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -13,6 +13,10 @@ export default function ParticipantsTab() {
   const [editTag, setEditTag] = useState('')
   const [uploadingId, setUploadingId] = useState<number | null>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
+  const { confirm, dialog } = useConfirm()
+
+  const errorMessage = (e: unknown, fallback: string) =>
+    (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
 
   const load = useCallback(() => api.get<Participant[]>('/api/admin/participants').then(r => setParticipants(r.data)), [])
   useEffect(() => { load() }, [load])
@@ -24,7 +28,7 @@ export default function ParticipantsTab() {
       setName(''); setTag('')
       await load()
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
+      setError(errorMessage(e, 'Feil'))
     }
   }
 
@@ -39,11 +43,12 @@ export default function ParticipantsTab() {
       setEditId(null)
       await load()
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil')
+      setError(errorMessage(e, 'Feil'))
     }
   }
 
   const uploadPhoto = async (participantId: number, file: File) => {
+    setError('')
     setUploadingId(participantId)
     const form = new FormData()
     form.append('file', file)
@@ -53,7 +58,21 @@ export default function ParticipantsTab() {
       })
       await load()
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Feil ved opplasting')
+      setError(errorMessage(e, 'Feil ved opplasting'))
+    } finally {
+      setUploadingId(null)
+    }
+  }
+
+  const removePhoto = async (p: Participant) => {
+    if (!await confirm(`Fjerne bildet av ${p.name}?`)) return
+    setError('')
+    setUploadingId(p.id)
+    try {
+      await api.delete(`/api/admin/participants/${p.id}/photo`)
+      await load()
+    } catch (e: unknown) {
+      setError(errorMessage(e, 'Feil ved sletting av bilde'))
     } finally {
       setUploadingId(null)
     }
@@ -61,10 +80,11 @@ export default function ParticipantsTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {error && <div className="alert alert-error">{error}</div>}
+
       <div className="card">
         <div className="card-header">Ny deltaker</div>
         <div className="card-body">
-          {error && <div className="alert alert-error">{error}</div>}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
               <label>Fullt navn</label>
@@ -96,7 +116,7 @@ export default function ParticipantsTab() {
               <tbody>
                 {participants.map(p => (
                   <tr key={p.id}>
-                    <td><ParticipantAvatar participant={p} /></td>
+                    <td><ParticipantAvatar participant={p} showPhoto /></td>
                     <td>
                       {editId === p.id
                         ? <input className="form-control" value={editName} onChange={e => setEditName(e.target.value)} style={{ maxWidth: 200 }} />
@@ -123,6 +143,15 @@ export default function ParticipantsTab() {
                           uploading={uploadingId === p.id}
                           onUpload={uploadPhoto}
                         />
+                        {p.hasPhoto && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            disabled={uploadingId === p.id}
+                            onClick={() => removePhoto(p)}
+                          >
+                            🗑️ Fjern bilde
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -132,6 +161,8 @@ export default function ParticipantsTab() {
           </div>
         )}
       </div>
+
+      {dialog}
     </div>
   )
 }
