@@ -183,6 +183,7 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
 
   const unassignedCount = prizes.filter(p => p.items.length === 0).length
   const assignedCount = prizes.filter(p => p.items.length > 0).length
+  const totalPrizeValue = prizes.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.price, 0), 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -244,7 +245,12 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
       {/* Prize list */}
       {prizes.length > 0 && (
         <div className="card">
-          <div className="card-header">Premiebord — posisjon og flasker</div>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+            <span>Premiebord — posisjon og flasker</span>
+            <span style={{ whiteSpace: 'nowrap' }}>
+              Totalt premiebeløp: <strong>{Math.round(totalPrizeValue).toLocaleString('nb-NO')} kr</strong>
+            </span>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {prizes.map(prize => {
               const totalPrice = prize.items.reduce((s, i) => s + i.price, 0)
