@@ -272,6 +272,50 @@ class LotteryService(
         )
     }
 
+    /**
+     * Money spent on tickets vs. Vinmonopolet value of prizes won, per participant, across closed lotteries.
+     * Prize value uses the inventory item's current price. Winners without a linked prize (drawn before
+     * prizes existed, or whose bottles were later deleted from inventory) count as wins without value.
+     */
+    fun getCellarBalance(): CellarBalanceDto {
+        val closedLotteries = lotteryRepo.findAllByStatusOrderByCreatedAtDesc(LotteryStatus.CLOSED)
+        if (closedLotteries.isEmpty()) return CellarBalanceDto(0, pricePerTicket, 0, 0.0, 0.0, 0, emptyList())
+
+        val ticketsByParticipant = ticketRepo.findAllByLotteriesWithParticipant(closedLotteries).groupBy { it.participant.id }
+        val winnersByParticipant = winnerRepo.findAllByLotteriesWithPrize(closedLotteries).groupBy { it.participant.id }
+
+        val participants = ticketsByParticipant.map { (participantId, tickets) ->
+            val participant = tickets.first().participant
+            val wins = winnersByParticipant[participantId].orEmpty()
+            val prizeValues = wins.map { w -> w.prize?.slots?.sumOf { it.inventoryItem.price * it.quantity } ?: 0.0 }
+            val spent = tickets.size.toLong() * pricePerTicket
+            val prizeValue = prizeValues.sum()
+            ParticipantBalanceDto(
+                participantId = participantId,
+                name = participant.name,
+                tag = participant.tag,
+                ticketsBought = tickets.size.toLong(),
+                amountSpentNok = spent,
+                wins = wins.size.toLong(),
+                winsWithoutValue = prizeValues.count { it == 0.0 }.toLong(),
+                prizeValueNok = prizeValue,
+                netNok = prizeValue - spent
+            )
+        }.sortedByDescending { it.netNok }
+
+        val totalSpent = participants.sumOf { it.amountSpentNok }
+        val totalPrizeValue = participants.sumOf { it.prizeValueNok }
+        return CellarBalanceDto(
+            totalLotteries = closedLotteries.size,
+            pricePerTicket = pricePerTicket,
+            totalSpentNok = totalSpent,
+            totalPrizeValueNok = totalPrizeValue,
+            netNok = totalPrizeValue - totalSpent,
+            winsWithoutValue = participants.sumOf { it.winsWithoutValue },
+            participants = participants
+        )
+    }
+
     fun getAllStatistics(): List<StatisticsDto> =
         lotteryRepo.findAllByStatusOrderByCreatedAtDesc(LotteryStatus.CLOSED).map { buildStatistics(it) }
 

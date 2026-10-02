@@ -140,3 +140,25 @@ export interface ShoppingSuggestions {
   products: VinmonopoletProduct[]
   prizeCount: number
 }
+
+export interface ParticipantBalance {
+  participantId: number
+  name: string
+  tag: string
+  ticketsBought: number
+  amountSpentNok: number
+  wins: number
+  winsWithoutValue: number
+  prizeValueNok: number
+  netNok: number
+}
+
+export interface CellarBalance {
+  totalLotteries: number
+  pricePerTicket: number
+  totalSpentNok: number
+  totalPrizeValueNok: number
+  netNok: number
+  winsWithoutValue: number
+  participants: ParticipantBalance[]
+}

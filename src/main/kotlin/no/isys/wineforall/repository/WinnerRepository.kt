@@ -19,6 +19,9 @@ interface WinnerRepository : JpaRepository<Winner, Long> {
     @Query("SELECT w FROM Winner w JOIN FETCH w.participant WHERE w.lottery IN :lotteries")
     fun findAllByLotteriesWithParticipant(lotteries: List<Lottery>): List<Winner>
 
+    @Query("SELECT DISTINCT w FROM Winner w JOIN FETCH w.participant LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE w.lottery IN :lotteries")
+    fun findAllByLotteriesWithPrize(lotteries: List<Lottery>): List<Winner>
+
     @Query("SELECT w FROM Winner w WHERE w.lottery = :lottery ORDER BY w.position")
     fun findByLotteryOrdered(lottery: Lottery): List<Winner>
 }

@@ -117,6 +117,11 @@ class AdminController(
     @GetMapping("/winners")
     fun getWinners(): List<WinnerDto> = drawingService.getCurrentWinners()
 
+    // --- Cellar balance (spent vs. prize value) ---
+
+    @GetMapping("/statistics/balance")
+    fun getCellarBalance(): CellarBalanceDto = lotteryService.getCellarBalance()
+
     // --- Shopping suggestions ---
 
     @GetMapping("/shopping/suggestions")

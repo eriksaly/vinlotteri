@@ -193,6 +193,30 @@ data class AllTimeStatisticsDto(
     val longestLoseStreak: List<StreakDto>
 )
 
+// --- Cellar balance (admin-only) ---
+
+data class ParticipantBalanceDto(
+    val participantId: Long,
+    val name: String,
+    val tag: String,
+    val ticketsBought: Long,
+    val amountSpentNok: Long,
+    val wins: Long,
+    val winsWithoutValue: Long,
+    val prizeValueNok: Double,
+    val netNok: Double
+)
+
+data class CellarBalanceDto(
+    val totalLotteries: Int,
+    val pricePerTicket: Int,
+    val totalSpentNok: Long,
+    val totalPrizeValueNok: Double,
+    val netNok: Double,
+    val winsWithoutValue: Long,
+    val participants: List<ParticipantBalanceDto>
+)
+
 // --- Vinmonopolet shopping ---
 
 data class VinmonopoletProductDto(

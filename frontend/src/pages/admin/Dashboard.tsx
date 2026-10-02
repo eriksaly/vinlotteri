@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import api from '../../api/client'
 import type { LotteryInfo } from '../../types'
 import NavBar from '../../components/NavBar'
+import BalanceTab from './BalanceTab'
 import BuyersTab from './BuyersTab'
 import DrawingTab from './DrawingTab'
 import InventoryTab from './InventoryTab'
@@ -10,7 +11,7 @@ import PrizesTab from './PrizesTab'
 import ShoppingTab from './ShoppingTab'
 import UsersTab from './UsersTab'
 
-type Tab = 'buyers' | 'drawing' | 'prizes' | 'inventory' | 'participants' | 'shopping' | 'users'
+type Tab = 'buyers' | 'drawing' | 'prizes' | 'inventory' | 'participants' | 'shopping' | 'users' | 'balance'
 
 export default function Dashboard() {
   const [tab, setTab] = useState<Tab>('buyers')
@@ -95,6 +96,7 @@ export default function Dashboard() {
                 <div className={`tab ${tab === 'participants' ? 'active' : ''}`} onClick={() => setTab('participants')}>👥 Vinfolket</div>
                 <div className={`tab ${tab === 'shopping' ? 'active' : ''}`} onClick={() => setTab('shopping')}>🛒 Fyll kjelleren</div>
                 <div className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>👑 Kjellerpersonalet</div>
+                <div className={`tab ${tab === 'balance' ? 'active' : ''}`} onClick={() => setTab('balance')}>🧾 Regnskap</div>
               </div>
               {tab === 'buyers' && <BuyersTab lottery={lottery} onLotteryChange={loadLottery} />}
               {tab === 'drawing' && <DrawingTab lottery={lottery} onLotteryChange={loadLottery} />}
@@ -103,6 +105,7 @@ export default function Dashboard() {
               {tab === 'participants' && <ParticipantsTab />}
               {tab === 'shopping' && <ShoppingTab />}
               {tab === 'users' && <UsersTab />}
+              {tab === 'balance' && <BalanceTab />}
             </>
           )}
         </div>
