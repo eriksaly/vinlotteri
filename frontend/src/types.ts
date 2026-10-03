@@ -162,3 +162,50 @@ export interface CellarBalance {
   winsWithoutValue: number
   participants: ParticipantBalance[]
 }
+
+export interface WineProduct {
+  productId: string
+  productShortName: string | null
+  productTypeName: string | null
+  subProductTypeName: string | null
+  country: string | null
+  regionDetailed: string | null
+  volume: number | null
+  price: number | null
+  // Price per litre divided by the score; lower is better value
+  pricePerScore: number | null
+  // null until Horten's stock has been checked
+  inStock: boolean | null
+  // Bottles in stock, when Vinmonopolet reported a count
+  hortenStock: number | null
+  stockCheckedAt: string | null
+  score: number
+  grade: number
+  // Vintage of the most recent review
+  vintage: number | null
+  // The vintage Vinmonopolet sells now, when known
+  vmpVintage: number | null
+  reviewCount: number
+  lastReviewedAt: string
+  imageUrl: string
+  vinmonopoletUrl: string
+}
+
+export interface WineReview {
+  id: number
+  vintage: number | null
+  score: number
+  grade: number
+  lead: string | null
+  authorDescription: string | null
+  price: number | null
+  articleUrl: string | null
+  reviewedAt: string
+}
+
+export interface WineReviewSyncResult {
+  fetchedReviews: number
+  newReviews: number
+  updatedReviews: number
+  newProducts: number
+}
