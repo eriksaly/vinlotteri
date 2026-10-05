@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef, memo, Fragment } from 'react'
 import { useNavigationType, useSearchParams } from 'react-router-dom'
-import api from '../../api/client'
-import type { WineProduct, WineReview, WineReviewSyncResult } from '../../types'
-import { MultiSelect, type MultiSelectOption } from './shared'
+import api from '../api/client'
+import type { WineProduct, WineReview, WineReviewSyncResult } from '../types'
+import { useAuth } from '../App'
+import NavBar from '../components/NavBar'
+import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect'
 
 type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
 type SortDir = 'asc' | 'desc'
@@ -100,7 +102,31 @@ function countBy(products: WineProduct[], value: (p: WineProduct) => string | nu
   return [...counts.entries()].map(([v, count]) => ({ value: v, label: v, count }))
 }
 
-export default function WineReviewsTab() {
+export default function WineReviews() {
+  return (
+    <div className="page">
+      <NavBar />
+
+      <div className="page-header">
+        <div className="container">
+          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>⭐</div>
+          <h1 className="page-title">VG-anmeldelser</h1>
+          <p className="page-subtitle">Terningkast fra VG, med lagerstatus fra Vinmonopolet i Horten.</p>
+        </div>
+      </div>
+
+      <div className="page-content">
+        <div className="container">
+          <WineReviewList />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WineReviewList() {
+  // Syncing from VG is admin-only
+  const isAdmin = useAuth().user?.role === 'ADMIN'
   // Filters and sorting are kept in the query string so a reload keeps them. The inputs work on local
   // state, which is mirrored into the URL, rather than reading the URL directly.
   const [params, setParams] = useSearchParams()
@@ -125,7 +151,7 @@ export default function WineReviewsTab() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api.get<WineProduct[]>('/api/admin/wine-reviews/products')
+      const r = await api.get<WineProduct[]>('/api/wine-reviews/products')
       setProducts(r.data)
       setLoadFailed(false)
     } catch {
@@ -185,7 +211,7 @@ export default function WineReviewsTab() {
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const r = await api.get<string[]>('/api/admin/wine-reviews/search', { params: { text: textQuery } })
+        const r = await api.get<string[]>('/api/wine-reviews/search', { params: { text: textQuery } })
         if (!cancelled) setTextMatches({ text: textQuery, ids: new Set(r.data) })
       } catch {
         if (!cancelled) setToast({ msg: 'Søket i anmeldelsene feilet', ok: false })
@@ -242,7 +268,7 @@ export default function WineReviewsTab() {
     setExpandedId(productId)
     if (reviews[productId]) return
     try {
-      const r = await api.get<WineReview[]>(`/api/admin/wine-reviews/products/${encodeURIComponent(productId)}/reviews`)
+      const r = await api.get<WineReview[]>(`/api/wine-reviews/products/${encodeURIComponent(productId)}/reviews`)
       setReviews(m => ({ ...m, [productId]: r.data }))
     } catch {
       setToast({ msg: 'Kunne ikke hente anmeldelsene', ok: false })
@@ -304,14 +330,16 @@ export default function WineReviewsTab() {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <div>VG-anmeldelser ({products.length} produkter · {reviewTotal} anmeldelser)</div>
+            <div>{products.length} produkter · {reviewTotal} anmeldelser</div>
             <div style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)', marginTop: '0.2rem' }}>
               Hentes fra VG hver natt. Vurderingen gjelder sist anmeldte årgang.
             </div>
           </div>
-          <button className="btn btn-outline btn-sm" onClick={sync} disabled={syncing}>
-            {syncing ? '⏳ Henter...' : '🔄 Hent nye'}
-          </button>
+          {isAdmin && (
+            <button className="btn btn-outline btn-sm" onClick={sync} disabled={syncing}>
+              {syncing ? '⏳ Henter...' : '🔄 Hent nye'}
+            </button>
+          )}
         </div>
 
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', borderBottom: '1px solid var(--border)' }}>
@@ -385,7 +413,9 @@ export default function WineReviewsTab() {
           <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
             {loadFailed
               ? 'Kunne ikke hente vinanmeldelsene. Prøv å laste siden på nytt.'
-              : 'Ingen anmeldelser hentet ennå. Trykk «Hent nye» for å hente fra VG.'}
+              : isAdmin
+                ? 'Ingen anmeldelser hentet ennå. Trykk «Hent nye» for å hente fra VG.'
+                : 'Ingen anmeldelser hentet ennå.'}
           </div>
         ) : visible.length === 0 ? (
           <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>

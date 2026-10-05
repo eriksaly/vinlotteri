@@ -4,6 +4,7 @@ import api from './api/client'
 import type { AppUser } from './types'
 import LotteryInfo from './pages/LotteryInfo'
 import Statistics from './pages/Statistics'
+import WineReviews from './pages/WineReviews'
 import Login from './pages/admin/Login'
 import Dashboard from './pages/admin/Dashboard'
 import AccessDenied from './pages/AccessDenied'
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><LotteryInfo /></ProtectedRoute>} />
           <Route path="/statistikk" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
+          <Route path="/vinanmeldelser" element={<ProtectedRoute><WineReviews /></ProtectedRoute>} />
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/dashboard/:tab?" element={<ProtectedRoute requiredRole="ADMIN"><Dashboard /></ProtectedRoute>} />
           <Route path="/ikke-verdig" element={<AccessDenied />} />
