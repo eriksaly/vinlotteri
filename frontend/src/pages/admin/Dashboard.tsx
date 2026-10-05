@@ -11,9 +11,8 @@ import ParticipantsTab from './ParticipantsTab'
 import PrizesTab from './PrizesTab'
 import ShoppingTab from './ShoppingTab'
 import UsersTab from './UsersTab'
-import WineReviewsTab from './WineReviewsTab'
 
-const TABS = ['buyers', 'drawing', 'prizes', 'inventory', 'participants', 'shopping', 'users', 'balance', 'reviews'] as const
+const TABS = ['buyers', 'drawing', 'prizes', 'inventory', 'participants', 'shopping', 'users', 'balance'] as const
 type Tab = typeof TABS[number]
 
 export default function Dashboard() {
@@ -109,7 +108,6 @@ export default function Dashboard() {
                 <div className={`tab ${tab === 'shopping' ? 'active' : ''}`} onClick={() => setTab('shopping')}>🛒 Fyll kjelleren</div>
                 <div className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>👑 Kjellerpersonalet</div>
                 <div className={`tab ${tab === 'balance' ? 'active' : ''}`} onClick={() => setTab('balance')}>🧾 Regnskap</div>
-                <div className={`tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>⭐ VG-anmeldelser</div>
               </div>
               {tab === 'buyers' && <BuyersTab lottery={lottery} onLotteryChange={loadLottery} />}
               {tab === 'drawing' && <DrawingTab lottery={lottery} onLotteryChange={loadLottery} />}
@@ -119,7 +117,6 @@ export default function Dashboard() {
               {tab === 'shopping' && <ShoppingTab />}
               {tab === 'users' && <UsersTab />}
               {tab === 'balance' && <BalanceTab />}
-              {tab === 'reviews' && <WineReviewsTab />}
             </>
           )}
         </div>

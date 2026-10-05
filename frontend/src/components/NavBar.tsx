@@ -17,6 +17,7 @@ export default function NavBar() {
         <div className="nav-links">
           <Link to="/" className="nav-link">Forside</Link>
           <Link to="/statistikk" className="nav-link">🏆 Hall of Vino</Link>
+          <Link to="/vinanmeldelser" className="nav-link">⭐ VG-anmeldelser</Link>
           {user?.role === 'ADMIN' && (
             <Link to="/admin/dashboard" className="btn btn-gold btn-sm">🗝️ Kjellermester</Link>
           )}
