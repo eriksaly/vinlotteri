@@ -232,3 +232,55 @@ data class ShoppingSuggestionsDto(
     val products: List<VinmonopoletProductDto>,
     val prizeCount: Int
 )
+
+// --- VG wine reviews ---
+
+data class WineProductDto(
+    val productId: String,
+    val productShortName: String?,
+    val productTypeName: String?,
+    // Broader grouping than productTypeName, e.g. "Musserende vin" for "Champagne, brut"
+    val subProductTypeName: String?,
+    val country: String?,
+    val regionDetailed: String?,
+    // Litres
+    val volume: Double?,
+    // Vinmonopolet's current price when known, otherwise VG's price from the time of the review
+    val price: Double?,
+    // Value for money as VG defines it: price per litre divided by the score. Lower is better.
+    val pricePerScore: Double?,
+    // In stock at Vinmonopolet Horten; null until Horten's stock has been checked
+    val inStock: Boolean?,
+    // Bottles in stock, when Vinmonopolet reported a count
+    val hortenStock: Int?,
+    val stockCheckedAt: Instant?,
+    // Score, grade and vintage of the most recent review
+    val score: Int,
+    val grade: Int,
+    val vintage: Int?,
+    // The vintage Vinmonopolet sells now, when known; can differ from the reviewed one
+    val vmpVintage: Int?,
+    val reviewCount: Int,
+    val lastReviewedAt: Instant,
+    val imageUrl: String,
+    val vinmonopoletUrl: String
+)
+
+data class WineReviewDto(
+    val id: Long,
+    val vintage: Int?,
+    val score: Int,
+    val grade: Int,
+    val lead: String?,
+    val authorDescription: String?,
+    val price: Double?,
+    val articleUrl: String?,
+    val reviewedAt: Instant
+)
+
+data class WineReviewSyncResultDto(
+    val fetchedReviews: Int,
+    val newReviews: Int,
+    val updatedReviews: Int,
+    val newProducts: Int
+)

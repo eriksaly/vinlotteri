@@ -85,7 +85,7 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><LotteryInfo /></ProtectedRoute>} />
           <Route path="/statistikk" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="ADMIN"><Dashboard /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/:tab?" element={<ProtectedRoute requiredRole="ADMIN"><Dashboard /></ProtectedRoute>} />
           <Route path="/ikke-verdig" element={<AccessDenied />} />
           {/* Legacy redirect */}
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />

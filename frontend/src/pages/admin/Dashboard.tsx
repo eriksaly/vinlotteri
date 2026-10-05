@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../api/client'
 import type { LotteryInfo } from '../../types'
 import NavBar from '../../components/NavBar'
@@ -10,19 +11,25 @@ import ParticipantsTab from './ParticipantsTab'
 import PrizesTab from './PrizesTab'
 import ShoppingTab from './ShoppingTab'
 import UsersTab from './UsersTab'
+import WineReviewsTab from './WineReviewsTab'
 
-type Tab = 'buyers' | 'drawing' | 'prizes' | 'inventory' | 'participants' | 'shopping' | 'users' | 'balance'
+const TABS = ['buyers', 'drawing', 'prizes', 'inventory', 'participants', 'shopping', 'users', 'balance', 'reviews'] as const
+type Tab = typeof TABS[number]
 
 export default function Dashboard() {
-  const [tab, setTab] = useState<Tab>('buyers')
+  // The tab lives in the path (/admin/dashboard/reviews) so a reload stays on it
+  const { tab: tabParam } = useParams()
+  const navigate = useNavigate()
+  const tab: Tab = TABS.find(t => t === tabParam) ?? 'buyers'
+  // Clicking the open tab does nothing, so it doesn't drop the tab's own query string (e.g. the review filters)
+  const setTab = (t: Tab, replace = false) => {
+    if (t !== tab) navigate(`/admin/dashboard/${t}`, { replace })
+  }
   const [lottery, setLottery] = useState<LotteryInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const loadLottery = useCallback(() => {
     return api.get<LotteryInfo>('/api/admin/lottery/current')
-      .then(r => {
-        setLottery(r.data)
-        if (r.data.status === 'DRAWING') setTab('drawing')
-      })
+      .then(r => setLottery(r.data))
       .catch(err => {
         if (err.response?.status === 204) setLottery(null)
       })
@@ -31,6 +38,11 @@ export default function Dashboard() {
   useEffect(() => {
     loadLottery().finally(() => setLoading(false))
   }, [loadLottery])
+
+  // Only the drawing and prizes tabs exist while drawing
+  useEffect(() => {
+    if (lottery?.status === 'DRAWING' && tab !== 'drawing' && tab !== 'prizes') setTab('drawing', true)
+  }, [lottery?.status, tab])
 
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -97,6 +109,7 @@ export default function Dashboard() {
                 <div className={`tab ${tab === 'shopping' ? 'active' : ''}`} onClick={() => setTab('shopping')}>🛒 Fyll kjelleren</div>
                 <div className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>👑 Kjellerpersonalet</div>
                 <div className={`tab ${tab === 'balance' ? 'active' : ''}`} onClick={() => setTab('balance')}>🧾 Regnskap</div>
+                <div className={`tab ${tab === 'reviews' ? 'active' : ''}`} onClick={() => setTab('reviews')}>⭐ VG-anmeldelser</div>
               </div>
               {tab === 'buyers' && <BuyersTab lottery={lottery} onLotteryChange={loadLottery} />}
               {tab === 'drawing' && <DrawingTab lottery={lottery} onLotteryChange={loadLottery} />}
@@ -106,6 +119,7 @@ export default function Dashboard() {
               {tab === 'shopping' && <ShoppingTab />}
               {tab === 'users' && <UsersTab />}
               {tab === 'balance' && <BalanceTab />}
+              {tab === 'reviews' && <WineReviewsTab />}
             </>
           )}
         </div>

@@ -8,6 +8,9 @@ import no.isys.wineforall.service.InventoryService
 import no.isys.wineforall.service.LotteryService
 import no.isys.wineforall.service.PrizeService
 import no.isys.wineforall.service.VinmonopoletService
+import no.isys.wineforall.service.WineReviewService
+import no.isys.wineforall.service.WineReviewSyncJob
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -20,6 +23,8 @@ class AdminController(
     private val vinmonopoletService: VinmonopoletService,
     private val inventoryService: InventoryService,
     private val prizeService: PrizeService,
+    private val wineReviewService: WineReviewService,
+    private val wineReviewSyncJob: WineReviewSyncJob,
     private val userRepository: AppUserRepository
 ) {
 
@@ -198,4 +203,24 @@ class AdminController(
         @PathVariable position: Int,
         @RequestBody req: AssignPrizeItemsRequest
     ): LotteryPrizeDto = prizeService.assignItems(position, req)
+
+    // --- VG wine reviews ---
+
+    @GetMapping("/wine-reviews/products")
+    fun getWineProducts(): List<WineProductDto> = wineReviewService.getProducts()
+
+    @GetMapping("/wine-reviews/products/{productId}/reviews")
+    fun getWineReviews(@PathVariable productId: String): List<WineReviewDto> =
+        wineReviewService.getReviews(productId)
+
+    // Ids of the products whose reviews contain every word in `text`
+    @GetMapping("/wine-reviews/search")
+    fun searchWineReviews(@RequestParam text: String): List<String> = wineReviewService.searchReviewText(text)
+
+    @PostMapping("/wine-reviews/sync")
+    fun syncWineReviews(): ResponseEntity<WineReviewSyncResultDto> {
+        val result = wineReviewSyncJob.sync()
+            ?: return ResponseEntity.status(HttpStatus.CONFLICT).build()
+        return ResponseEntity.ok(result)
+    }
 }

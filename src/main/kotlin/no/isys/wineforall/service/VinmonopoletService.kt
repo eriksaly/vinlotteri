@@ -7,20 +7,24 @@ import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.json.JsonMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
+import tools.jackson.core.JacksonException
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 @Service
-class VinmonopoletService {
+class VinmonopoletService(restClientBuilder: RestClient.Builder) {
 
     private val log = LoggerFactory.getLogger(VinmonopoletService::class.java)
     private val baseUrl = "https://www.vinmonopolet.no/vmpws/v2/vmp"
     // Coordinates for Vinmonopolet Horten Sjøsiden
     private val storeLat = "59.417084"
     private val storeLon = "10.4832128"
-    private val client = RestClient.create()
+    // Timeouts come from spring.http.clients.* in application.yaml
+    private val client = restClientBuilder.build()
     private val objectMapper = JsonMapper.builder()
         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .build()
@@ -349,7 +353,106 @@ class VinmonopoletService {
         }
     }
 
-    data class SearchResponse(val products: List<ProductRaw>? = null)
+    // Vinmonopolet's catalogue status for a product ("aktiv", "utsolgt", "utgatt" for Utgått, ...), its
+    // current price and the vintage it sells now. Null if Vinmonopolet doesn't know the varenummer.
+    // Unlike search, this also finds discontinued products.
+    fun getProductStatus(code: String): ProductStatus? {
+        val raw = try {
+            client.get()
+                // FULL: the default fields leave out the vintage (year)
+                .uri("https://www.vinmonopolet.no/vmpws/v3/vmp/products/{code}?fields=FULL", code)
+                .header("Accept", "application/json")
+                .retrieve()
+                .body(String::class.java)
+        } catch (e: HttpClientErrorException.NotFound) {
+            return null
+        } ?: return null
+        val parsed = parse(raw, ProductStatusRaw::class.java)
+        return ProductStatus(status = parsed.status, price = parsed.price?.value, vintage = parsed.year?.toIntOrNull())
+    }
+
+    // One page of the products in stock at Horten. Vinmonopolet returns at most 24 products per page,
+    // whatever pageSize asks for. Sorted by name rather than relevance so the order holds still while paging.
+    fun getHortenStockPage(page: Int): HortenStockPage {
+        val q = URLEncoder.encode(":name-asc:availableInStores:$storeId", StandardCharsets.UTF_8).replace("+", "%20")
+        val url = "$baseUrl/products/search?fields=FULL&pageSize=24&currentPage=$page&q=$q&latitude=$storeLat&longitude=$storeLon"
+        val raw = client.get()
+            .uri(URI.create(url))
+            .header("Accept", "application/json")
+            .retrieve()
+            .body(String::class.java) ?: throw IllegalStateException("Empty response for Horten stock page $page")
+        return parseHortenStockPage(raw)
+    }
+
+    internal fun parseHortenStockPage(json: String): HortenStockPage {
+        val parsed = parse(json, SearchResponse::class.java)
+        return HortenStockPage(
+            products = parsed.products.orEmpty().mapNotNull { it.toStoreProduct() },
+            totalPages = parsed.pagination?.totalPages ?: 0,
+            totalResults = parsed.pagination?.totalResults ?: 0
+        )
+    }
+
+    // With coordinates, storesAvailability describes the nearest store, i.e. Horten: "13 i butikken"
+    private val storeStockPattern = Regex("""^(\d+) i butikken""")
+
+    // The search results have no year field, but Vinmonopolet ends the names of vintage wines with the
+    // vintage ("Cune Crianza 2021"). Non-vintage products have no year.
+    private val vintageInName = Regex("""\b((?:19|20)\d{2})$""")
+
+    private fun ProductRaw.toStoreProduct(): StoreProduct? {
+        return StoreProduct(
+            code = code ?: return null,
+            name = name ?: return null,
+            price = price?.value,
+            mainCategory = mainCategory?.name,
+            mainCategoryCode = mainCategory?.code,
+            mainSubCategory = mainSubCategory?.name,
+            mainSubCategoryCode = mainSubCategory?.code,
+            country = mainCountry?.name,
+            // Vinmonopolet gives centilitres
+            volume = volume?.value?.let { it / 100 },
+            alcohol = alcohol?.value,
+            productSelection = productSelection,
+            url = url?.let { "https://www.vinmonopolet.no$it" },
+            vintage = vintageInName.find(name.trim())?.groupValues?.get(1)?.toInt(),
+            stockLevel = productAvailability?.storesAvailability?.infos.orEmpty()
+                .firstNotNullOfOrNull { storeStockPattern.find(it.availability ?: "")?.groupValues?.get(1)?.toInt() }
+        )
+    }
+
+    data class HortenStockPage(val products: List<StoreProduct>, val totalPages: Int, val totalResults: Int)
+    data class StoreProduct(
+        val code: String,
+        val name: String,
+        val price: Double?,
+        val mainCategory: String?,
+        val mainCategoryCode: String?,
+        val mainSubCategory: String?,
+        val mainSubCategoryCode: String?,
+        val country: String?,
+        val volume: Double?,
+        val alcohol: Double?,
+        val productSelection: String?,
+        val url: String?,
+        val vintage: Int?,
+        // Bottles in the store; null if the availability text couldn't be read
+        val stockLevel: Int?
+    )
+
+    // A body that isn't the JSON we expect fails like any other bad response from Vinmonopolet
+    private fun <T : Any> parse(json: String, type: Class<T>): T = try {
+        objectMapper.readValue(json, type)
+    } catch (e: JacksonException) {
+        throw RestClientException("Unexpected response from Vinmonopolet: ${e.message}", e)
+    }
+
+    data class ProductStatus(val status: String?, val price: Double?, val vintage: Int?)
+    // year is a string ("2021"), and missing for non-vintage products
+    data class ProductStatusRaw(val status: String? = null, val price: PriceRaw? = null, val year: String? = null)
+
+    data class SearchResponse(val products: List<ProductRaw>? = null, val pagination: PaginationRaw? = null)
+    data class PaginationRaw(val totalPages: Int? = null, val totalResults: Int? = null)
     data class ProductRaw(
         val code: String? = null,
         val name: String? = null,
@@ -358,10 +461,18 @@ class VinmonopoletService {
         val stock: StockRaw? = null,
         @JsonProperty("main_category") val mainCategory: CategoryRaw? = null,
         @JsonProperty("main_sub_category") val mainSubCategory: CategoryRaw? = null,
-        @JsonProperty("main_country") val mainCountry: CategoryRaw? = null
+        @JsonProperty("main_country") val mainCountry: CategoryRaw? = null,
+        val volume: MeasureRaw? = null,
+        val alcohol: MeasureRaw? = null,
+        @JsonProperty("product_selection") val productSelection: String? = null,
+        val productAvailability: ProductAvailabilityRaw? = null
     )
     data class CategoryRaw(val name: String? = null, val code: String? = null)
     data class PriceRaw(val value: Double? = null)
+    data class MeasureRaw(val value: Double? = null)
+    data class ProductAvailabilityRaw(val storesAvailability: StoresAvailabilityRaw? = null)
+    data class StoresAvailabilityRaw(val infos: List<AvailabilityInfoRaw>? = null)
+    data class AvailabilityInfoRaw(val availability: String? = null)
     // stock reflects the nearest store (determined by lat/lon); stockLevelStatus "outOfStock" = not in Horten
     data class StockRaw(val stockLevel: Int? = null, val stockLevelStatus: String? = null)
 }

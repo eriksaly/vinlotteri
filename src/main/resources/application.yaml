@@ -27,8 +27,21 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+  http:
+    clients:
+      # For the VG and Vinmonopolet clients, so a hung request can't block the nightly jobs
+      connect-timeout: 10s
+      read-timeout: 30s
+  task:
+    scheduling:
+      pool:
+        # The Vinmonopolet stock check runs for 1.5–2 hours; a second thread keeps it from blocking the review sync
+        size: 2
 
 app:
+  # Nightly VG/Vinmonopolet jobs and their startup runs; switched off in tests
+  background-jobs:
+    enabled: ${BACKGROUND_JOBS_ENABLED:true}
   bootstrap-admin-email: ${BOOTSTRAP_ADMIN_EMAIL:esa@isys.no}
   allowed-emails: ${ALLOWED_EMAILS:}
   allowed-origin: ${ALLOWED_ORIGIN:http://localhost:5173}
