@@ -25,25 +25,25 @@ class PrizeService(
 
     fun getPrizesForCurrentLottery(): List<LotteryPrizeDto> {
         val lottery = getCurrentActiveOrDrawingLottery() ?: return emptyList()
-        val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
+        val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
         return prizeRepo.findAllByLotteryOrderByPosition(lottery).map { it.toDto(winners) }
     }
 
     @Transactional
     fun setPrizeSlots(count: Int): List<LotteryPrizeDto> {
         require(count in 1..100) { "Antall premier må være mellom 1 og 100" }
-        val lottery = getCurrentActiveOrDrawingLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentActiveOrDrawingLottery()
         val existing = prizeRepo.findAllByLotteryOrderByPosition(lottery)
 
         when {
             count > existing.size -> {
                 val newSlots = ((existing.size + 1)..count).map { pos ->
-                    LotteryPrize(lottery = lottery, position = pos)
+                    LotteryPrize(lotteryId = lottery.id, position = pos)
                 }
-                prizeRepo.saveAll(newSlots)
+                prizeRepo.insertAll(newSlots)
             }
             count < existing.size -> {
-                val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
+                val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
                 val wonPositions = winners.mapNotNull { it.prize?.position }.toSet()
                 val toRemove = existing
                     .filter { it.position > count && it.position !in wonPositions }
@@ -52,16 +52,15 @@ class PrizeService(
             }
         }
 
-        lottery.wineCount = count
-        lotteryRepo.save(lottery)
+        lotteryRepo.updateWineCount(lottery, count)
 
-        val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
+        val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
         return prizeRepo.findAllByLotteryOrderByPosition(lottery).map { it.toDto(winners) }
     }
 
     @Transactional
     fun assignItems(position: Int, req: AssignPrizeItemsRequest): LotteryPrizeDto {
-        val lottery = getCurrentActiveOrDrawingLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentActiveOrDrawingLottery()
         val prize = prizeRepo.findByLotteryAndPosition(lottery, position)
             ?: error("Premie #$position finnes ikke")
 
@@ -69,17 +68,19 @@ class PrizeService(
         val countById = req.inventoryItemIds.groupingBy { it }.eachCount()
         val items = inventoryRepo.findAllById(countById.keys)
 
-        prize.slots.clear()
-        items.forEach { item ->
-            prize.slots.add(PrizeItemSlot(prize = prize, inventoryItem = item, quantity = countById[item.id] ?: 1))
-        }
-        prizeRepo.save(prize)
-        val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
-        return prize.toDto(winners)
+        val slots = items.map { item -> PrizeItemSlot(inventoryItem = item, quantity = countById[item.id] ?: 1) }
+        prizeRepo.replaceSlots(prize, slots)
+        val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
+        return prize.copy(slots = slots).toDto(winners)
     }
 
     fun getPrizeAtPosition(lottery: Lottery, position: Int): LotteryPrize? =
         prizeRepo.findByLotteryAndPosition(lottery, position)
+
+    // Locked until the transaction ends (LotteryRepository.lock), and checked again once locked
+    private fun lockCurrentActiveOrDrawingLottery(): Lottery =
+        getCurrentActiveOrDrawingLottery()?.let { lotteryRepo.lock(it) }?.takeIf { it.status != LotteryStatus.CLOSED }
+            ?: error("Ingen aktiv lotteri")
 
     private fun getCurrentActiveOrDrawingLottery(): Lottery? =
         lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.OPEN)

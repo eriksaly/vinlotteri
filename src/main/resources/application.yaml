@@ -16,13 +16,10 @@ spring:
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 5
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        format_sql: false
-    open-in-view: false
+  flyway:
+    # Databases whose schema Hibernate created, before the switch to Exposed, record V1 as applied instead
+    # of running it
+    baseline-on-migrate: true
   session:
     jdbc:
       # Sessions live in Postgres so logins survive a backend restart; creates the SPRING_SESSION

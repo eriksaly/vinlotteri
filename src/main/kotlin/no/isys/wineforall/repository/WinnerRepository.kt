@@ -1,27 +1,65 @@
 package no.isys.wineforall.repository
 
 import no.isys.wineforall.model.Lottery
-import no.isys.wineforall.model.Participant
 import no.isys.wineforall.model.Winner
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Query
+import org.jetbrains.exposed.v1.core.JoinType
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 
-interface WinnerRepository : JpaRepository<Winner, Long> {
-    fun findAllByLotteryOrderByPosition(lottery: Lottery): List<Winner>
+@Repository
+@Transactional
+class WinnerRepository(private val prizeRepo: LotteryPrizeRepository) {
 
-    @Query("SELECT DISTINCT w FROM Winner w LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE w.lottery = :lottery ORDER BY w.position")
-    fun findAllByLotteryWithPrizeOrderByPosition(lottery: Lottery): List<Winner>
-    fun countByLotteryAndParticipant(lottery: Lottery, participant: Participant): Long
+    fun findAllByLotteryOrderByPosition(lottery: Lottery): List<Winner> =
+        fetch { Winners.lotteryId eq lottery.id }
 
-    @Query("SELECT w.participant, COUNT(w) as wins FROM Winner w WHERE w.lottery IN :lotteries GROUP BY w.participant")
-    fun countWinsByParticipantInLotteries(lotteries: List<Lottery>): List<Array<Any>>
+    fun findAllByLotteries(lotteries: List<Lottery>): List<Winner> =
+        fetch { Winners.lotteryId inList lotteries.map { it.id } }
 
-    @Query("SELECT w FROM Winner w JOIN FETCH w.participant WHERE w.lottery IN :lotteries")
-    fun findAllByLotteriesWithParticipant(lotteries: List<Lottery>): List<Winner>
+    fun countByLottery(lottery: Lottery): Int =
+        Winners.selectAll().where { Winners.lotteryId eq lottery.id }.count().toInt()
 
-    @Query("SELECT DISTINCT w FROM Winner w JOIN FETCH w.participant LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE w.lottery IN :lotteries")
-    fun findAllByLotteriesWithPrize(lotteries: List<Lottery>): List<Winner>
+    fun insert(winner: Winner): Winner {
+        val id = Winners.insert {
+            it[drawnAt] = winner.drawnAt
+            it[position] = winner.position
+            it[lotteryId] = winner.lotteryId
+            it[participantId] = winner.participant.id
+            it[prizeId] = winner.prize?.id
+            it[ticketId] = winner.ticket.id
+        } get Winners.id
+        return winner.copy(id = id)
+    }
 
-    @Query("SELECT w FROM Winner w WHERE w.lottery = :lottery ORDER BY w.position")
-    fun findByLotteryOrdered(lottery: Lottery): List<Winner>
+    // The prizes come from a second query, as a prize has a list of slots
+    private fun fetch(where: () -> Op<Boolean>): List<Winner> {
+        val rows = Winners
+            .join(Tickets, JoinType.INNER, Winners.ticketId, Tickets.id)
+            .join(Participants, JoinType.INNER, Winners.participantId, Participants.id)
+            .select(Winners.columns + Tickets.columns + participantColumns)
+            .where(where)
+            .orderBy(Winners.lotteryId to SortOrder.ASC, Winners.position to SortOrder.ASC)
+            .toList()
+        val prizes = prizeRepo.findAllById(rows.mapNotNull { it[Winners.prizeId] }).associateBy { it.id }
+        return rows.map { row ->
+            val participant = row.toParticipant()
+            Winner(
+                id = row[Winners.id],
+                // The winning ticket belongs to the winner
+                ticket = row.toTicket(participant),
+                participant = participant,
+                lotteryId = row[Winners.lotteryId],
+                position = row[Winners.position],
+                drawnAt = row[Winners.drawnAt],
+                prize = row[Winners.prizeId]?.let { prizes[it] }
+            )
+        }
+    }
 }

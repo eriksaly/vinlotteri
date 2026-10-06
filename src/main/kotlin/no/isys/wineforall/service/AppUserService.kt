@@ -39,25 +39,24 @@ class AppUserService(
             )
         }
 
-        val user = userRepository.findByEmail(email) ?: run {
+        val existing = userRepository.findByEmail(email) ?: run {
             val initialRole = if (bootstrapAdminEmail.isNotBlank() && email == bootstrapAdminEmail)
                 UserRole.ADMIN else UserRole.USER
-            userRepository.save(
+            userRepository.insert(
                 AppUser(
                     email = email,
                     name = oidcUser.fullName ?: email,
-                    googleSub = oidcUser.subject,
+                    // Spring Security rejects ID tokens without one
+                    googleSub = checkNotNull(oidcUser.subject) { "ID token without a subject" },
                     role = initialRole
                 )
             )
         }
 
-        user.lastLoginAt = Instant.now()
-        user.name = oidcUser.fullName ?: user.name
-        if (bootstrapAdminEmail.isNotBlank() && email == bootstrapAdminEmail && user.role == UserRole.USER) {
-            user.role = UserRole.ADMIN
+        if (bootstrapAdminEmail.isNotBlank() && email == bootstrapAdminEmail && existing.role == UserRole.USER) {
+            userRepository.updateRole(existing.id, UserRole.ADMIN)
         }
-        userRepository.save(user)
+        val user = userRepository.recordLogin(existing, oidcUser.fullName ?: existing.name, Instant.now())
 
         val authorities = oidcUser.authorities + SimpleGrantedAuthority("ROLE_${user.role}")
         return DefaultOidcUser(authorities, oidcUser.idToken, oidcUser.userInfo)

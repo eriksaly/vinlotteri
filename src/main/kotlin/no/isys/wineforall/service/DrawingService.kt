@@ -23,30 +23,33 @@ class DrawingService(
 
     @Transactional
     fun drawNextWinner(): DrawResultDto {
+        // Locked, so a draw at the same time waits for this one instead of picking from the same remaining
+        // tickets for the same position
         val lottery = lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.DRAWING)
+            ?.let { lotteryRepo.lock(it) }
+            ?.takeIf { it.status == LotteryStatus.DRAWING }
             ?: error("Ingen trekning pågår")
 
         val remaining = ticketRepo.findAllByLotteryAndWon(lottery, false)
         require(remaining.isNotEmpty()) { "Ingen gjenværende lodd" }
 
-        val winningTicket = remaining.random()
-        winningTicket.won = true
-        ticketRepo.save(winningTicket)
+        val winningTicket = remaining.random().copy(won = true)
+        ticketRepo.markWon(winningTicket)
 
-        val position = winnerRepo.findAllByLotteryOrderByPosition(lottery).size + 1
+        val position = winnerRepo.countByLottery(lottery) + 1
         val prize = prizeRepo.findByLotteryAndPosition(lottery, position)
 
-        val winner = winnerRepo.save(
+        val winner = winnerRepo.insert(
             Winner(
                 ticket = winningTicket,
                 participant = winningTicket.participant,
-                lottery = lottery,
+                lotteryId = lottery.id,
                 position = position,
                 prize = prize
             )
         )
 
-        val remainingCount = ticketRepo.findAllByLotteryAndWon(lottery, false).size.toLong()
+        val remainingCount = ticketRepo.countByLotteryAndWon(lottery, false)
 
         val prizeDto = prize?.toDto(winner.id)
 
@@ -70,7 +73,7 @@ class DrawingService(
         val lottery = lotteryRepo.findTopByStatusInOrderByCreatedAtDesc(
             listOf(LotteryStatus.DRAWING, LotteryStatus.CLOSED)
         ) ?: return emptyList()
-        return winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery).map { w ->
+        return winnerRepo.findAllByLotteryOrderByPosition(lottery).map { w ->
             WinnerDto(
                 position = w.position,
                 ticketNumber = w.ticket.ticketNumber,

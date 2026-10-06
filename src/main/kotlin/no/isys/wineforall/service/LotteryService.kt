@@ -4,6 +4,7 @@ import no.isys.wineforall.dto.*
 import no.isys.wineforall.model.*
 import no.isys.wineforall.repository.*
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,6 +25,12 @@ class LotteryService(
         lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.OPEN)
             ?: lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.DRAWING)
 
+    // The current lottery, locked until the transaction ends (LotteryRepository.lock). Checked again once
+    // locked, as the request that held the lock may have closed it.
+    private fun lockCurrentLottery(): Lottery =
+        getCurrentLottery()?.let { lotteryRepo.lock(it) }?.takeIf { it.status != LotteryStatus.CLOSED }
+            ?: error("Ingen aktiv lotteri")
+
     fun getCurrentLotteryInfo(): LotteryInfoDto? {
         val lottery = getCurrentLottery() ?: return null
         return lottery.toInfoDto()
@@ -34,29 +41,34 @@ class LotteryService(
         val existing = getCurrentLottery()
         require(existing == null) { "Det finnes allerede et aktivt lotteri" }
         val name = java.time.LocalDate.now().toString() // yyyy-mm-dd
-        val lottery = lotteryRepo.save(Lottery(name = name))
+        val lottery = try {
+            lotteryRepo.insert(Lottery(name = name))
+        } catch (e: DuplicateKeyException) {
+            // Another request created one after the check above (lotteries_one_active_idx)
+            throw IllegalArgumentException("Det finnes allerede et aktivt lotteri", e)
+        }
         return lottery.toInfoDto()
     }
 
     @Transactional
     fun startDrawing(wineCount: Int): LotteryInfoDto {
-        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentLottery()
         require(lottery.status == LotteryStatus.OPEN) { "Lotteriet er ikke åpent" }
         // If prize slots are already configured, use their count; otherwise use the request param
         val prizeSlotCount = prizeRepo.countByLottery(lottery)
         val effectiveCount = if (prizeSlotCount > 0) prizeSlotCount else wineCount
         require(effectiveCount in 1..100) { "Antall viner må være mellom 1 og 100" }
-        lottery.status = LotteryStatus.DRAWING
-        lottery.wineCount = effectiveCount
-        return lotteryRepo.save(lottery).toInfoDto()
+        lotteryRepo.updateStatus(lottery, LotteryStatus.DRAWING)
+        lotteryRepo.updateWineCount(lottery, effectiveCount)
+        return lottery.copy(status = LotteryStatus.DRAWING, wineCount = effectiveCount).toInfoDto()
     }
 
     @Transactional
     fun finishLottery(): LotteryInfoDto {
-        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentLottery()
         require(lottery.status == LotteryStatus.DRAWING) { "Trekning er ikke startet" }
-        lottery.status = LotteryStatus.CLOSED
-        return lotteryRepo.save(lottery).toInfoDto()
+        lotteryRepo.updateStatus(lottery, LotteryStatus.CLOSED)
+        return lottery.copy(status = LotteryStatus.CLOSED).toInfoDto()
     }
 
     // --- Buyers ---
@@ -64,9 +76,9 @@ class LotteryService(
     fun getBuyers(): List<BuyerDto> {
         val lottery = getCurrentLottery() ?: return emptyList()
         val tickets = if (lottery.status == LotteryStatus.DRAWING)
-            ticketRepo.findAllByLotteryAndWonWithParticipant(lottery, false)
+            ticketRepo.findAllByLotteryAndWon(lottery, false)
         else
-            ticketRepo.findAllByLotteryWithParticipant(lottery)
+            ticketRepo.findAllByLottery(lottery)
         val totalTickets = tickets.size.toLong()
 
         return tickets.groupBy { it.participant.id }
@@ -86,23 +98,23 @@ class LotteryService(
     @Transactional
     fun addBuyer(participantId: Long, quantity: Int): List<BuyerDto> {
         require(quantity in 1..100) { "Antall lodd må være mellom 1 og 100" }
-        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentLottery()
         require(lottery.status == LotteryStatus.OPEN) { "Lotteriet er ikke lenger åpent for nye lodd" }
-        val participant = participantRepo.findById(participantId).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        val participant = participantRepo.findById(participantId) ?: throw IllegalArgumentException("Deltaker ikke funnet")
         val nextNumber = ticketRepo.findMaxTicketNumberByLottery(lottery) + 1
         val tickets = (nextNumber until nextNumber + quantity).map { num ->
-            Ticket(ticketNumber = num, participant = participant, lottery = lottery)
+            Ticket(ticketNumber = num, participant = participant, lotteryId = lottery.id)
         }
-        ticketRepo.saveAll(tickets)
+        ticketRepo.insertAll(tickets)
         return getBuyers()
     }
 
     @Transactional
     fun updateBuyer(participantId: Long, newQuantity: Int): List<BuyerDto> {
         require(newQuantity in 1..100) { "Antall lodd må være mellom 1 og 100" }
-        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentLottery()
         require(lottery.status == LotteryStatus.OPEN) { "Lotteriet er ikke åpent" }
-        val participant = participantRepo.findById(participantId).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        val participant = participantRepo.findById(participantId) ?: throw IllegalArgumentException("Deltaker ikke funnet")
         val existingTickets = ticketRepo.findAllByLotteryAndParticipant(lottery, participant)
         val current = existingTickets.size
 
@@ -110,15 +122,15 @@ class LotteryService(
             newQuantity > current -> {
                 val nextNumber = ticketRepo.findMaxTicketNumberByLottery(lottery) + 1
                 val tickets = (nextNumber until nextNumber + (newQuantity - current)).map { num ->
-                    Ticket(ticketNumber = num, participant = participant, lottery = lottery)
+                    Ticket(ticketNumber = num, participant = participant, lotteryId = lottery.id)
                 }
-                ticketRepo.saveAll(tickets)
+                ticketRepo.insertAll(tickets)
             }
             newQuantity < current -> {
                 val toRemove = existingTickets
                     .sortedByDescending { it.ticketNumber }
                     .take(current - newQuantity)
-                ticketRepo.deleteAllByIdInBatch(toRemove.map { it.id })
+                ticketRepo.deleteAllById(toRemove.map { it.id })
             }
         }
         return getBuyers()
@@ -126,9 +138,9 @@ class LotteryService(
 
     @Transactional
     fun removeBuyer(participantId: Long): List<BuyerDto> {
-        val lottery = getCurrentLottery() ?: error("Ingen aktiv lotteri")
+        val lottery = lockCurrentLottery()
         require(lottery.status == LotteryStatus.OPEN) { "Kan ikke fjerne lodd etter trekning er startet" }
-        val participant = participantRepo.findById(participantId).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        val participant = participantRepo.findById(participantId) ?: throw IllegalArgumentException("Deltaker ikke funnet")
         ticketRepo.deleteAllByLotteryAndParticipant(lottery, participant)
         return getBuyers()
     }
@@ -145,41 +157,38 @@ class LotteryService(
         if (participantRepo.existsByTagIgnoreCase(tag)) {
             error("Tag '$tag' er allerede i bruk")
         }
-        val participant = participantRepo.save(Participant(name = name.trim(), tag = tag.trim().uppercase()))
+        val participant = participantRepo.insert(Participant(name = name.trim(), tag = tag.trim().uppercase()))
         return participant.toDto()
     }
 
     @Transactional
     fun updateParticipant(id: Long, name: String, tag: String): ParticipantDto {
-        val participant = participantRepo.findById(id).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
+        val participant = participantRepo.findById(id) ?: throw IllegalArgumentException("Deltaker ikke funnet")
         val upperTag = tag.trim().uppercase()
         if (!participant.tag.equals(upperTag, ignoreCase = true) && participantRepo.existsByTagIgnoreCase(upperTag)) {
             error("Tag '$upperTag' er allerede i bruk")
         }
-        participant.name = name.trim()
-        participant.tag = upperTag
-        return participantRepo.save(participant).toDto()
+        val updated = participant.copy(name = name.trim(), tag = upperTag)
+        participantRepo.update(updated)
+        return updated.toDto()
     }
 
     @Transactional
     fun updateParticipantPhoto(id: Long, photoData: ByteArray, contentType: String): ParticipantDto {
-        val participant = participantRepo.findById(id).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
-        participant.photoData = photoData
-        participant.photoContentType = contentType
-        return participantRepo.save(participant).toDto()
+        val participant = participantRepo.findById(id) ?: throw IllegalArgumentException("Deltaker ikke funnet")
+        participantRepo.updatePhoto(id, photoData, contentType)
+        return participant.copy(hasPhoto = true).toDto()
     }
 
     fun deleteParticipantPhoto(id: Long): ParticipantDto {
-        val participant = participantRepo.findById(id).orElseThrow { IllegalArgumentException("Deltaker ikke funnet") }
-        participant.photoData = null
-        participant.photoContentType = null
-        return participantRepo.save(participant).toDto()
+        val participant = participantRepo.findById(id) ?: throw IllegalArgumentException("Deltaker ikke funnet")
+        participantRepo.updatePhoto(id, null, null)
+        return participant.copy(hasPhoto = false).toDto()
     }
 
     fun getParticipantPhoto(id: Long): Pair<ByteArray, String>? {
-        val participant = participantRepo.findById(id).orElse(null) ?: return null
-        val data = participant.photoData ?: return null
-        return Pair(data, participant.photoContentType ?: "image/jpeg")
+        val (data, contentType) = participantRepo.findPhoto(id) ?: return null
+        return Pair(data, contentType ?: "image/jpeg")
     }
 
     // --- Statistics ---
@@ -197,15 +206,15 @@ class LotteryService(
         val allParticipants = participantRepo.findAll()
 
         // Bulk load — 2 queries instead of P×L×4
-        val allTickets = ticketRepo.findAllByLotteriesWithParticipant(closedLotteries)
-        val allWinners = winnerRepo.findAllByLotteriesWithParticipant(closedLotteries)
+        val allTickets = ticketRepo.findAllByLotteries(closedLotteries)
+        val allWinners = winnerRepo.findAllByLotteries(closedLotteries)
 
         // ticketCount[lotteryId][participantId] = count
-        val ticketCount = allTickets.groupBy { it.lottery.id }
+        val ticketCount = allTickets.groupBy { it.lotteryId }
             .mapValues { (_, tickets) -> tickets.groupBy { it.participant.id }.mapValues { (_, t) -> t.size.toLong() } }
 
         // winCount[lotteryId][participantId] = count
-        val winCount = allWinners.groupBy { it.lottery.id }
+        val winCount = allWinners.groupBy { it.lotteryId }
             .mapValues { (_, winners) -> winners.groupBy { it.participant.id }.mapValues { (_, w) -> w.size.toLong() } }
 
         val participantStats = allParticipants.mapNotNull { participant ->
@@ -220,7 +229,7 @@ class LotteryService(
                 participantId = participant.id,
                 name = participant.name,
                 tag = participant.tag,
-                hasPhoto = participant.photoData != null,
+                hasPhoto = participant.hasPhoto,
                 totalTicketsBought = totalTickets,
                 totalWins = totalWins,
                 lotteriesParticipated = participated.size,
@@ -249,7 +258,7 @@ class LotteryService(
             // Streak only counts if the participant played in the most recent closed lottery.
             // This prevents someone from permanently holding a streak after stopping.
             if (participated.lastOrNull()?.id != lastLottery?.id) { curWin = 0; curLose = 0 }
-            val streak = StreakDto(participant.id, participant.name, participant.tag, participant.photoData != null, 0, participated.size)
+            val streak = StreakDto(participant.id, participant.name, participant.tag, participant.hasPhoto, 0, participated.size)
             if (curWin > 1) winStreaks.add(streak.copy(streak = curWin))
             if (curLose > 1) loseStreaks.add(streak.copy(streak = curLose))
         }
@@ -281,8 +290,8 @@ class LotteryService(
         val closedLotteries = lotteryRepo.findAllByStatusOrderByCreatedAtDesc(LotteryStatus.CLOSED)
         if (closedLotteries.isEmpty()) return CellarBalanceDto(0, pricePerTicket, 0, 0.0, 0.0, 0, emptyList())
 
-        val ticketsByParticipant = ticketRepo.findAllByLotteriesWithParticipant(closedLotteries).groupBy { it.participant.id }
-        val winnersByParticipant = winnerRepo.findAllByLotteriesWithPrize(closedLotteries).groupBy { it.participant.id }
+        val ticketsByParticipant = ticketRepo.findAllByLotteries(closedLotteries).groupBy { it.participant.id }
+        val winnersByParticipant = winnerRepo.findAllByLotteries(closedLotteries).groupBy { it.participant.id }
 
         val participants = ticketsByParticipant.map { (participantId, tickets) ->
             val participant = tickets.first().participant
@@ -320,7 +329,7 @@ class LotteryService(
         lotteryRepo.findAllByStatusOrderByCreatedAtDesc(LotteryStatus.CLOSED).map { buildStatistics(it) }
 
     private fun buildStatistics(lottery: Lottery): StatisticsDto {
-        val tickets = ticketRepo.findAllByLotteryWithParticipant(lottery)
+        val tickets = ticketRepo.findAllByLottery(lottery)
         val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
         val totalTickets = tickets.size.toLong()
 
@@ -331,7 +340,7 @@ class LotteryService(
                 participantId = p.id,
                 name = p.name,
                 tag = p.tag,
-                hasPhoto = p.photoData != null,
+                hasPhoto = p.hasPhoto,
                 ticketsBought = pTickets.size.toLong(),
                 wins = wins,
                 winRatio = if (pTickets.isNotEmpty()) wins.toDouble() / pTickets.size else 0.0
@@ -366,7 +375,7 @@ class LotteryService(
 
     fun Participant.toDto() = ParticipantDto(
         id = id, name = name, tag = tag,
-        hasPhoto = photoData != null,
+        hasPhoto = hasPhoto,
         createdAt = createdAt
     )
 
