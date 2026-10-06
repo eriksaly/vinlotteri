@@ -45,6 +45,8 @@ interface Filters {
   types: string[]
   q: string
   maxPrice: string
+  // Lowest score (points) of the most recent review
+  minScore: string
   inStockOnly: boolean
   countries: string[]
   regions: string[]
@@ -62,6 +64,7 @@ function filtersFromQuery(params: URLSearchParams): Filters {
     types: params.getAll('type').filter(Boolean),
     q: params.get('q') ?? '',
     maxPrice: params.get('maxPrice') ?? '',
+    minScore: params.get('minScore') ?? '',
     inStockOnly: params.get('inStock') !== '0',
     countries: params.getAll('country').filter(Boolean),
     regions: params.getAll('region').filter(Boolean),
@@ -80,6 +83,7 @@ function filtersToQuery(f: Filters): string {
   f.types.forEach(v => params.append('type', v))
   if (f.q) params.set('q', f.q)
   if (f.maxPrice) params.set('maxPrice', f.maxPrice)
+  if (f.minScore) params.set('minScore', f.minScore)
   if (!f.inStockOnly) params.set('inStock', '0')
   f.countries.forEach(v => params.append('country', v))
   f.regions.forEach(v => params.append('region', v))
@@ -133,7 +137,7 @@ function WineReviewList() {
   const query = params.toString()
   const navigationType = useNavigationType()
   const [filters, setFilters] = useState(() => filtersFromQuery(params))
-  const { types, q: search, maxPrice, inStockOnly, countries, regions, volumes, text, sort } = filters
+  const { types, q: search, maxPrice, minScore, inStockOnly, countries, regions, volumes, text, sort } = filters
   const updateFilters = (changes: Partial<Filters>) => setFilters(f => ({ ...f, ...changes }))
   const [products, setProducts] = useState<WineProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -226,16 +230,18 @@ function WineReviewList() {
   const deferred = useDeferredValue(filters)
   const deferredTextActive = deferred.text.trim().length >= 2
   const visible = useMemo(() => {
-    const { types, q: search, maxPrice, inStockOnly, countries, regions, volumes, sort } = deferred
+    const { types, q: search, maxPrice, minScore, inStockOnly, countries, regions, volumes, sort } = deferred
     const inCountries = (p: WineProduct) => countries.length === 0 || (p.country != null && countries.includes(p.country))
     const q = search.trim().toLowerCase()
     const max = maxPrice === '' ? null : Number(maxPrice)
+    const min = minScore === '' ? null : Number(minScore)
     const getValue = SORT_VALUE[sort.key]
     const factor = sort.dir === 'asc' ? 1 : -1
     return products
       .filter(p => types.length === 0 || (p.subProductTypeName != null && types.includes(p.subProductTypeName)))
       .filter(p => !q || (p.productShortName ?? '').toLowerCase().includes(q) || p.productId.includes(q))
       .filter(p => max == null || (p.price != null && p.price <= max))
+      .filter(p => min == null || p.score >= min)
       .filter(p => !inStockOnly || p.inStock === true)
       .filter(inCountries)
       .filter(p => regions.length === 0 || (p.regionDetailed != null && regions.includes(p.regionDetailed)))
@@ -372,6 +378,20 @@ function WineReviewList() {
               />
               kr
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Min. poeng
+              <input
+                className="form-control"
+                style={{ width: 90 }}
+                type="number"
+                min={80}
+                max={100}
+                step={1}
+                placeholder="Alle"
+                value={minScore}
+                onChange={e => updateFilters({ minScore: e.target.value })}
+              />
+            </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <input type="checkbox" checked={inStockOnly} onChange={e => updateFilters({ inStockOnly: e.target.checked })} />
               Kun på lager i Horten
@@ -402,7 +422,7 @@ function WineReviewList() {
             {textSearching && (
               <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Søker...</span>
             )}
-            {(types.length > 0 || search || maxPrice || inStockOnly || countries.length > 0 || regions.length > 0
+            {(types.length > 0 || search || maxPrice || minScore || inStockOnly || countries.length > 0 || regions.length > 0
               || volumes.length > 0 || textQuery.length >= 2) && (
               <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{visible.length} treff</span>
             )}
