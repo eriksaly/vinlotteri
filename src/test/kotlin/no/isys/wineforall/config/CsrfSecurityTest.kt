@@ -2,8 +2,14 @@ package no.isys.wineforall.config
 
 import no.isys.wineforall.controller.AdminController
 import no.isys.wineforall.controller.PublicController
+import no.isys.wineforall.repository.AppUserRepository
+import no.isys.wineforall.service.AppUserService
 import no.isys.wineforall.service.DrawingService
+import no.isys.wineforall.service.InventoryService
 import no.isys.wineforall.service.LotteryService
+import no.isys.wineforall.service.PrizeService
+import no.isys.wineforall.service.VinmonopoletService
+import no.isys.wineforall.service.WineReviewSyncJob
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
@@ -29,6 +35,24 @@ class CsrfSecurityTest {
 
     @MockitoBean
     lateinit var drawingService: DrawingService
+
+    @MockitoBean
+    lateinit var vinmonopoletService: VinmonopoletService
+
+    @MockitoBean
+    lateinit var inventoryService: InventoryService
+
+    @MockitoBean
+    lateinit var prizeService: PrizeService
+
+    @MockitoBean
+    lateinit var wineReviewSyncJob: WineReviewSyncJob
+
+    @MockitoBean
+    lateinit var appUserRepository: AppUserRepository
+
+    @MockitoBean
+    lateinit var appUserService: AppUserService
 
     @Test
     fun `GET requests set XSRF-TOKEN cookie`() {
@@ -60,13 +84,12 @@ class CsrfSecurityTest {
     }
 
     @Test
-    fun `login endpoint is exempt from CSRF`() {
+    fun `logout is exempt from CSRF and clears the session cookie`() {
         mockMvc.perform(
-            post("/api/admin/login")
-                .contentType("application/x-www-form-urlencoded")
-                .param("username", "wrong")
-                .param("password", "wrong")
+            post("/api/auth/logout")
+                .with(user("someone"))
         )
-            .andExpect(status().isUnauthorized)
+            .andExpect(status().isOk)
+            .andExpect(cookie().maxAge("SESSION", 0))
     }
 }
