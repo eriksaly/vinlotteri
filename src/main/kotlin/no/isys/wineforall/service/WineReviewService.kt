@@ -1,6 +1,5 @@
 package no.isys.wineforall.service
 
-import jakarta.persistence.EntityManager
 import no.isys.wineforall.dto.WineProductDto
 import no.isys.wineforall.dto.WineReviewDto
 import no.isys.wineforall.dto.WineReviewSyncResultDto
@@ -18,8 +17,7 @@ import kotlin.math.abs
 class WineReviewService(
     private val productRepo: VGProductRepository,
     private val reviewRepo: VGReviewRepository,
-    private val hortenStockService: HortenStockService,
-    private val entityManager: EntityManager
+    private val hortenStockService: HortenStockService
 ) {
 
     fun hasReviews(): Boolean = reviewRepo.count() > 0
@@ -27,22 +25,13 @@ class WineReviewService(
     fun getProductIdsDueForStatusCheck(checkedBefore: Instant): List<String> =
         productRepo.findIdsDueForStatusCheck(checkedBefore)
 
-    @Transactional
-    fun recordStatusCheck(productId: String, discontinued: Boolean, vmpPrice: Double?, vmpVintage: Int?) {
-        val product = productRepo.findById(productId).orElse(null) ?: return
-        product.discontinued = discontinued
-        product.vmpPrice = vmpPrice
-        product.vmpVintage = vmpVintage
-        product.statusCheckedAt = Instant.now()
-    }
+    fun recordStatusCheck(productId: String, discontinued: Boolean, vmpPrice: Double?, vmpVintage: Int?) =
+        productRepo.updateStatus(productId, discontinued, vmpPrice, vmpVintage, Instant.now())
 
     // A failed check still counts as an attempt, so a product that keeps failing goes to the back of
     // the queue instead of being retried first every night
-    @Transactional
-    fun recordFailedStatusCheck(productId: String) {
-        val product = productRepo.findById(productId).orElse(null) ?: return
-        product.statusCheckedAt = Instant.now()
-    }
+    fun recordFailedStatusCheck(productId: String) =
+        productRepo.updateStatusCheckedAt(productId, Instant.now())
 
     // VG's reviewed products combined with Horten's stock (vmp_horten_products). Products Vinmonopolet
     // lists as discontinued ("Utgått") are left out, unless Horten still has some.
@@ -77,7 +66,7 @@ class WineReviewService(
                 // Horten's listing when Horten has the product (null there means non-vintage), otherwise the
                 // weekly discontinued check
                 vmpVintage = if (stock != null) stock.vintage else p.vmpVintage,
-                reviewCount = p.reviewCount.toInt(),
+                reviewCount = p.reviewCount,
                 lastReviewedAt = p.reviewedAt,
                 // The list shows 40 px thumbnails, so the 300x300 image (~4 KB) rather than 1200x1200 (~30 KB)
                 imageUrl = "https://bilder.vinmonopolet.no/cache/300x300-0/${p.productId}-1.jpg",
@@ -123,105 +112,104 @@ class WineReviewService(
     // Expects the complete feed: product fields are taken from each product's most recent review.
     @Transactional
     fun upsert(records: List<VGWineReview>): WineReviewSyncResultDto {
-        val products = productRepo.findAll().associateBy { it.productId }.toMutableMap()
-        val reviews = reviewRepo.findAllWithProduct().associateBy { it.id }
-        var newProducts = 0
-        var newReviews = 0
-        var updatedReviews = 0
+        val products = productRepo.findAll().associateBy { it.productId }
+        val reviews = reviewRepo.findAll().associateBy { it.id }
+        val newProducts = mutableListOf<VGProduct>()
+        val changedProducts = mutableListOf<VGProduct>()
+        val newReviews = mutableListOf<VGReview>()
+        val changedReviews = mutableListOf<VGReview>()
 
-        // persist() rather than save(): with assigned ids, save() would SELECT before every insert
         records.groupBy { it.productId }.forEach { (productId, productRecords) ->
             val latest = productRecords.maxBy { it.id }
             val existing = products[productId]
             if (existing == null) {
-                newProducts++
-                products[productId] = VGProduct(productId = productId)
-                    .also { it.applyFrom(latest); entityManager.persist(it) }
+                newProducts += VGProduct(productId = productId).applyFrom(latest)
             } else {
-                existing.applyFrom(latest)
+                val updated = existing.applyFrom(latest)
+                if (updated != existing) changedProducts += updated
             }
         }
 
         records.forEach { record ->
-            val product = products.getValue(record.productId)
             val existing = reviews[record.id]
             when {
-                existing == null -> {
-                    newReviews++
-                    entityManager.persist(record.toReview(product))
-                }
-                existing.sourceUpdatedAt != record.updatedAt || existing.product.productId != record.productId -> {
-                    updatedReviews++
-                    existing.applyFrom(record, product)
-                }
+                existing == null -> newReviews += record.toReview()
+                existing.sourceUpdatedAt != record.updatedAt || existing.productId != record.productId ->
+                    changedReviews += existing.applyFrom(record)
             }
         }
 
+        // Products first, as reviews reference them
+        productRepo.insertAll(newProducts)
+        productRepo.updateCatalogue(changedProducts)
+        reviewRepo.insertAll(newReviews)
+        reviewRepo.updateAll(changedReviews)
+
         return WineReviewSyncResultDto(
             fetchedReviews = records.size,
-            newReviews = newReviews,
-            updatedReviews = updatedReviews,
-            newProducts = newProducts
+            newReviews = newReviews.size,
+            updatedReviews = changedReviews.size,
+            newProducts = newProducts.size
         )
     }
 
-    private fun VGProduct.applyFrom(r: VGWineReview) {
-        productShortName = r.productShortName
-        productTypeName = r.productTypeName
-        subProductTypeName = r.subProductTypeName
-        mainProductTypeName = r.mainProductTypeName
-        productGroupName = r.productGroupName
-        country = r.country
-        regionDetailed = r.regionDetailed
-        subRegion = r.subRegion
-        origin = r.origin
-        grape = r.grape
-        price = r.priceNum
-        salesPricePerLiter = r.salesPricePrLiter
-        volume = r.volume
-        volumeType = r.volumeType
-        packagingMaterial = r.packagingMaterial
-        corkType = r.corkType
+    private fun VGProduct.applyFrom(r: VGWineReview) = copy(
+        productShortName = r.productShortName,
+        productTypeName = r.productTypeName,
+        subProductTypeName = r.subProductTypeName,
+        mainProductTypeName = r.mainProductTypeName,
+        productGroupName = r.productGroupName,
+        country = r.country,
+        regionDetailed = r.regionDetailed,
+        subRegion = r.subRegion,
+        origin = r.origin,
+        grape = r.grape,
+        price = r.priceNum,
+        salesPricePerLiter = r.salesPricePrLiter,
+        volume = r.volume,
+        volumeType = r.volumeType,
+        packagingMaterial = r.packagingMaterial,
+        corkType = r.corkType,
         // A few of VG's order types carry a trailing non-breaking space
         orderType = r.orderType?.trim()
-    }
+    )
 
-    private fun VGWineReview.toReview(product: VGProduct) = VGReview(
+    private fun VGWineReview.toReview() = VGReview(
         id = id,
-        product = product,
+        productId = productId,
         score = scoreNum,
         grade = gradeNum,
         reviewedAt = createdAt,
         sourceUpdatedAt = updatedAt
-    ).also { it.applyFrom(this, product) }
+    ).applyFrom(this)
 
-    private fun VGReview.applyFrom(r: VGWineReview, product: VGProduct) {
-        this.product = product
+    private fun VGReview.applyFrom(r: VGWineReview) = copy(
+        productId = r.productId,
         // VG marks non-vintage wines with either null or 0
-        vintage = r.vintage?.takeIf { it > 0 }
-        score = r.scoreNum
-        grade = r.gradeNum
-        lead = r.lead
-        authorDescription = r.authorDescription
-        article = r.article
-        price = r.priceNum
-        salesPricePerLiter = r.salesPricePrLiter
-        pricePerScore = r.pricePerScore
-        alcoholLevel = r.alcoholLevel
-        sugarContent = r.sugarContent
-        colour = r.colour
-        odour = r.odour
-        taste = r.taste
-        freshness = r.freshness
-        fullness = r.fullness
-        bitterness = r.bitterness
-        sweetness = r.sweetness
-        tannins = r.tannins
-        barrel = r.barrel
-        spice = r.spice
-        fruit = r.fruit
-        imageUrl = r.image?.urls?.minByOrNull { abs(it.width - 400) }?.url
-        reviewedAt = r.createdAt
+        vintage = r.vintage?.takeIf { it > 0 },
+        score = r.scoreNum,
+        grade = r.gradeNum,
+        lead = r.lead,
+        authorDescription = r.authorDescription,
+        article = r.article,
+        price = r.priceNum,
+        salesPricePerLiter = r.salesPricePrLiter,
+        pricePerScore = r.pricePerScore,
+        alcoholLevel = r.alcoholLevel,
+        sugarContent = r.sugarContent,
+        colour = r.colour,
+        odour = r.odour,
+        taste = r.taste,
+        freshness = r.freshness,
+        fullness = r.fullness,
+        bitterness = r.bitterness,
+        sweetness = r.sweetness,
+        tannins = r.tannins,
+        barrel = r.barrel,
+        spice = r.spice,
+        fruit = r.fruit,
+        imageUrl = r.image?.urls?.minByOrNull { abs(it.width - 400) }?.url,
+        reviewedAt = r.createdAt,
         sourceUpdatedAt = r.updatedAt
-    }
+    )
 }

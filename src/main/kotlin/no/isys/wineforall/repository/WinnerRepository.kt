@@ -1,27 +1,65 @@
 package no.isys.wineforall.repository
 
+import no.isys.wineforall.jooq.tables.records.WinnersRecord
+import no.isys.wineforall.jooq.tables.references.PARTICIPANTS
+import no.isys.wineforall.jooq.tables.references.TICKETS
+import no.isys.wineforall.jooq.tables.references.WINNERS
 import no.isys.wineforall.model.Lottery
-import no.isys.wineforall.model.Participant
 import no.isys.wineforall.model.Winner
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Query
+import org.jooq.Condition
+import org.jooq.DSLContext
+import org.springframework.stereotype.Repository
 
-interface WinnerRepository : JpaRepository<Winner, Long> {
-    fun findAllByLotteryOrderByPosition(lottery: Lottery): List<Winner>
+@Repository
+class WinnerRepository(
+    private val dsl: DSLContext,
+    private val prizeRepo: LotteryPrizeRepository
+) {
 
-    @Query("SELECT DISTINCT w FROM Winner w LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE w.lottery = :lottery ORDER BY w.position")
-    fun findAllByLotteryWithPrizeOrderByPosition(lottery: Lottery): List<Winner>
-    fun countByLotteryAndParticipant(lottery: Lottery, participant: Participant): Long
+    fun findAllByLotteryOrderByPosition(lottery: Lottery): List<Winner> =
+        fetch(WINNERS.LOTTERY_ID.eq(lottery.id))
 
-    @Query("SELECT w.participant, COUNT(w) as wins FROM Winner w WHERE w.lottery IN :lotteries GROUP BY w.participant")
-    fun countWinsByParticipantInLotteries(lotteries: List<Lottery>): List<Array<Any>>
+    fun findAllByLotteries(lotteries: List<Lottery>): List<Winner> =
+        fetch(WINNERS.LOTTERY_ID.`in`(lotteries.map { it.id }))
 
-    @Query("SELECT w FROM Winner w JOIN FETCH w.participant WHERE w.lottery IN :lotteries")
-    fun findAllByLotteriesWithParticipant(lotteries: List<Lottery>): List<Winner>
+    fun countByLottery(lottery: Lottery): Int =
+        dsl.fetchCount(WINNERS, WINNERS.LOTTERY_ID.eq(lottery.id))
 
-    @Query("SELECT DISTINCT w FROM Winner w JOIN FETCH w.participant LEFT JOIN FETCH w.prize p LEFT JOIN FETCH p.slots s LEFT JOIN FETCH s.inventoryItem WHERE w.lottery IN :lotteries")
-    fun findAllByLotteriesWithPrize(lotteries: List<Lottery>): List<Winner>
+    fun insert(winner: Winner): Winner {
+        val id = dsl.insertInto(WINNERS).set(winner.toRecord()).returningResult(WINNERS.ID).fetchSingle().value1()!!
+        return winner.copy(id = id)
+    }
 
-    @Query("SELECT w FROM Winner w WHERE w.lottery = :lottery ORDER BY w.position")
-    fun findByLotteryOrdered(lottery: Lottery): List<Winner>
+    // The prizes come from a second query, as a prize has a list of slots
+    private fun fetch(condition: Condition): List<Winner> {
+        val rows = dsl.select(WINNERS, TICKETS, PARTICIPANT)
+            .from(WINNERS)
+            .join(TICKETS).on(TICKETS.ID.eq(WINNERS.TICKET_ID))
+            .join(PARTICIPANTS).on(PARTICIPANTS.ID.eq(WINNERS.PARTICIPANT_ID))
+            .where(condition)
+            .orderBy(WINNERS.LOTTERY_ID, WINNERS.POSITION)
+            .fetch()
+        val prizes = prizeRepo.findAllById(rows.mapNotNull { (winner) -> winner.prizeId }).associateBy { it.id }
+        return rows.map { (winner, ticket, participant) ->
+            Winner(
+                id = winner.id!!,
+                // The winning ticket belongs to the winner
+                ticket = ticket.toTicket(participant),
+                participant = participant,
+                lotteryId = winner.lotteryId,
+                position = winner.position,
+                drawnAt = winner.drawnAt,
+                prize = winner.prizeId?.let { prizes[it] }
+            )
+        }
+    }
 }
+
+private fun Winner.toRecord() = WinnersRecord(
+    drawnAt = drawnAt,
+    position = position,
+    lotteryId = lotteryId,
+    participantId = participant.id,
+    prizeId = prize?.id,
+    ticketId = ticket.id
+)

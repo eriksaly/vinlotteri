@@ -19,9 +19,7 @@ class InventoryService(
 ) {
 
     fun getAll(): List<InventoryItemDto> {
-        val assignedCounts = slotRepo.findAllWithItem()
-            .groupBy { it.inventoryItem.id }
-            .mapValues { (_, slots) -> slots.sumOf { it.quantity } }
+        val assignedCounts = slotRepo.sumQuantityByInventoryItemId()
         return inventoryRepo.findAll()
             .sortedBy { it.createdAt }
             .mapNotNull { item ->
@@ -35,12 +33,7 @@ class InventoryService(
         require(req.vinmonopoletCode.isNotBlank()) { "Varenummer kan ikke være tomt" }
         require(req.name.isNotBlank()) { "Navn kan ikke være tomt" }
         require(req.quantity >= 1) { "Antall må være minst 1" }
-        val existing = inventoryRepo.findByVinmonopoletCode(req.vinmonopoletCode.trim())
-        if (existing != null) {
-            existing.quantity += req.quantity
-            return inventoryRepo.save(existing).toDto()
-        }
-        val item = inventoryRepo.save(
+        val item = inventoryRepo.insertOrAddQuantity(
             InventoryItem(
                 vinmonopoletCode = req.vinmonopoletCode.trim(),
                 name = req.name.trim(),
@@ -59,22 +52,24 @@ class InventoryService(
 
     @Transactional
     fun update(id: Long, req: UpdateInventoryItemRequest): InventoryItemDto {
-        val item = inventoryRepo.findById(id).orElseThrow { IllegalArgumentException("Varebeholdning ikke funnet") }
+        val item = inventoryRepo.lock(id) ?: throw IllegalArgumentException("Varebeholdning ikke funnet")
         require(req.quantity >= 0) { "Antall kan ikke være negativt" }
-        item.name = req.name.trim()
-        item.price = req.price
-        item.category = req.category.trim()
-        item.quantity = req.quantity
-        item.country = req.country.trim()
-        return inventoryRepo.save(item).toDto()
+        val updated = item.copy(
+            name = req.name.trim(),
+            price = req.price,
+            category = req.category.trim(),
+            quantity = req.quantity,
+            country = req.country.trim()
+        )
+        inventoryRepo.update(updated)
+        return updated.toDto()
     }
 
     @Transactional
     fun delete(id: Long) {
-        val item = inventoryRepo.findById(id).orElseThrow { IllegalArgumentException("Varebeholdning ikke funnet") }
+        val item = inventoryRepo.lock(id) ?: throw IllegalArgumentException("Varebeholdning ikke funnet")
         if (item.quantity > 1) {
-            item.quantity -= 1
-            inventoryRepo.save(item)
+            inventoryRepo.update(item.copy(quantity = item.quantity - 1))
         } else {
             slotRepo.deleteAllByInventoryItemId(id)
             prizeRepo.clearLegacyItemColumn(id)

@@ -47,7 +47,15 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -110,7 +118,6 @@
                     </args>
                     <compilerPlugins>
                         <plugin>spring</plugin>
-                        <plugin>jpa</plugin>
                     </compilerPlugins>
                 </configuration>
                 <dependencies>
@@ -119,12 +126,78 @@
                         <artifactId>kotlin-maven-allopen</artifactId>
                         <version>${kotlin.version}</version>
                     </dependency>
+                </dependencies>
+            </plugin>
+            <!-- Generates the jOOQ classes from the Flyway migrations, so building needs no database -->
+            <plugin>
+                <groupId>org.jooq</groupId>
+                <artifactId>jooq-codegen-maven</artifactId>
+                <version>${jooq.version}</version>
+                <executions>
+                    <execution>
+                        <id>jooq-codegen</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <dependencies>
                     <dependency>
-                        <groupId>org.jetbrains.kotlin</groupId>
-                        <artifactId>kotlin-maven-noarg</artifactId>
-                        <version>${kotlin.version}</version>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-meta-extensions</artifactId>
+                        <version>${jooq.version}</version>
                     </dependency>
                 </dependencies>
+                <configuration>
+                    <generator>
+                        <name>org.jooq.codegen.KotlinGenerator</name>
+                        <database>
+                            <name>org.jooq.meta.extensions.ddl.DDLDatabase</name>
+                            <properties>
+                                <property>
+                                    <key>scripts</key>
+                                    <value>${project.basedir}/src/main/resources/db/migration/*.sql</value>
+                                </property>
+                                <property>
+                                    <key>sort</key>
+                                    <value>flyway</value>
+                                </property>
+                                <property>
+                                    <key>defaultNameCase</key>
+                                    <value>lower</value>
+                                </property>
+                                <!-- Skips statements between [jooq ignore start] and [jooq ignore stop] comments -->
+                                <property>
+                                    <key>parseIgnoreComments</key>
+                                    <value>true</value>
+                                </property>
+                            </properties>
+                            <forcedTypes>
+                                <forcedType>
+                                    <name>INSTANT</name>
+                                    <includeTypes>TIMESTAMP\ WITH\ TIME\ ZONE</includeTypes>
+                                </forcedType>
+                                <forcedType>
+                                    <userType>no.isys.wineforall.model.UserRole</userType>
+                                    <enumConverter>true</enumConverter>
+                                    <includeExpression>app_users\.role</includeExpression>
+                                </forcedType>
+                                <forcedType>
+                                    <userType>no.isys.wineforall.model.LotteryStatus</userType>
+                                    <enumConverter>true</enumConverter>
+                                    <includeExpression>lotteries\.status</includeExpression>
+                                </forcedType>
+                            </forcedTypes>
+                        </database>
+                        <generate>
+                            <kotlinNotNullRecordAttributes>true</kotlinNotNullRecordAttributes>
+                        </generate>
+                        <target>
+                            <packageName>no.isys.wineforall.jooq</packageName>
+                        </target>
+                    </generator>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.github.eirslett</groupId>

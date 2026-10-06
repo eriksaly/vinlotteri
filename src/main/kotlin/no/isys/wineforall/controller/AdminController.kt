@@ -35,10 +35,8 @@ class AdminController(
 
     @PutMapping("/users/{id}/role")
     fun updateUserRole(@PathVariable id: Long, @RequestBody req: UpdateRoleRequest): UserDto {
-        val user = userRepository.findById(id).orElseThrow { IllegalArgumentException("Bruker ikke funnet") }
-        user.role = req.role
-        val saved = userRepository.save(user)
-        return UserDto(saved.id, saved.email, saved.name, saved.role, saved.createdAt, saved.lastLoginAt)
+        val user = userRepository.updateRole(id, req.role) ?: throw IllegalArgumentException("Bruker ikke funnet")
+        return UserDto(user.id, user.email, user.name, user.role, user.createdAt, user.lastLoginAt)
     }
 
     @DeleteMapping("/users/{id}")
