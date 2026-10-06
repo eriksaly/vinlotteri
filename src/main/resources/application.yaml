@@ -23,6 +23,11 @@ spring:
       hibernate:
         format_sql: false
     open-in-view: false
+  session:
+    jdbc:
+      # Sessions live in Postgres so logins survive a backend restart; creates the SPRING_SESSION
+      # tables on first startup (later runs hit "already exists", which continue-on-error ignores)
+      initialize-schema: always
   servlet:
     multipart:
       max-file-size: 5MB
@@ -50,6 +55,12 @@ app:
 
 server:
   port: ${PORT:8080}
+  servlet:
+    session:
+      # Stay logged in for 30 days, also after closing the browser or the home screen app
+      timeout: 30d
+      cookie:
+        max-age: 30d
   tomcat:
     threads:
       max: 25

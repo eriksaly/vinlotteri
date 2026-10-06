@@ -73,7 +73,7 @@ class SecurityConfig(
                         response.contentType = "application/json;charset=UTF-8"
                         response.writer.write("""{"success":true}""")
                     }
-                    .deleteCookies("JSESSIONID")
+                    .deleteCookies("SESSION")
                     .permitAll()
             }
             .exceptionHandling { ex ->
