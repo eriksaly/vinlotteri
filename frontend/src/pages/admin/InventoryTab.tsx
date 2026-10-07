@@ -355,6 +355,6 @@ export default function InventoryTab() {
 
 function VgCell({ item }: { item: InventoryItem }) {
   return item.vgScore != null
-    ? <VgRating score={item.vgScore} grade={item.vgGrade} size={22} />
+    ? <VgRating productId={item.vinmonopoletCode} score={item.vgScore} grade={item.vgGrade} size={22} />
     : <span style={{ color: 'var(--text-muted)' }}>—</span>
 }

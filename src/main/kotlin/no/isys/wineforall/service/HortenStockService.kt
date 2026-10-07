@@ -19,6 +19,12 @@ class HortenStockService(
 
     fun getAll(): List<VmpHortenProduct> = repo.findAll()
 
+    // null when Horten doesn't have the product in stock
+    fun get(productId: String): VmpHortenProduct? = repo.findById(productId).orElse(null)
+
+    // When Horten's stock was last checked; null if it never has been
+    fun getLastStockCheck(): Instant? = repo.findLastStockCheck()
+
     // Replaces the table with a complete store listing: listed products are inserted or updated,
     // everything else has sold out and is deleted.
     @Transactional

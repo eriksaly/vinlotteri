@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 // VG's terningkast dice, served from public/terningkast/1.svg–6.svg
 export function Terningkast({ grade, size, style }: { grade: number; size: number; style?: React.CSSProperties }) {
   if (grade < 1 || grade > 6) return <span style={style}>{grade}</span>
@@ -13,8 +15,11 @@ export function Terningkast({ grade, size, style }: { grade: number; size: numbe
   )
 }
 
-// Points and terningkast from VG's most recent review, or nothing when VG hasn't reviewed the product
-export function VgRating({ score, grade, size = 18, style }: {
+// Points and terningkast from VG's most recent review, linking to the product's page, or nothing when
+// VG hasn't reviewed the product
+export function VgRating({ productId, score, grade, size = 18, style }: {
+  // Vinmonopolet varenummer
+  productId: string
   score: number | null
   grade: number | null
   size?: number
@@ -22,10 +27,14 @@ export function VgRating({ score, grade, size = 18, style }: {
 }) {
   if (score == null || grade == null) return null
   return (
-    <span style={{ whiteSpace: 'nowrap', ...style }} title={`VG: ${score} poeng, terningkast ${grade}`}>
+    <Link
+      to={`/vinanmeldelser/${encodeURIComponent(productId)}`}
+      style={{ whiteSpace: 'nowrap', ...style }}
+      title={`VG: ${score} poeng, terningkast ${grade}. Se anmeldelsene.`}
+    >
       <span style={{ fontWeight: 600 }}>{score}</span>
       <span style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}> p</span>
       <Terningkast grade={grade} size={size} style={{ marginLeft: '0.35rem' }} />
-    </span>
+    </Link>
   )
 }

@@ -14,4 +14,7 @@ interface VmpHortenProductRepository : JpaRepository<VmpHortenProduct, String> {
     @Modifying(flushAutomatically = true)
     @Query("UPDATE VmpHortenProduct p SET p.stockCheckedAt = :checkedAt")
     fun setStockCheckedAt(checkedAt: Instant)
+
+    @Query("SELECT MAX(p.stockCheckedAt) FROM VmpHortenProduct p")
+    fun findLastStockCheck(): Instant?
 }

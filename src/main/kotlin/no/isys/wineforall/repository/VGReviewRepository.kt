@@ -27,18 +27,12 @@ interface VGReviewRepository : JpaRepository<VGReview, Long> {
 
     // One row per product with its most recent review and review count, for the product list. Selects
     // only the columns the list shows, so the review texts aren't loaded.
-    @Query(
-        """
-        SELECT new no.isys.wineforall.repository.VGProductSummary(
-            p.productId, p.productShortName, p.productTypeName, p.subProductTypeName, p.country,
-            p.regionDetailed, p.volume, p.price, p.vmpPrice, p.vmpVintage, p.discontinued,
-            r.score, r.grade, r.vintage, r.reviewedAt,
-            (SELECT COUNT(r2) FROM VGReview r2 WHERE r2.product = p))
-        FROM VGReview r JOIN r.product p
-        WHERE r.id = (SELECT MAX(r3.id) FROM VGReview r3 WHERE r3.product = p)
-        """
-    )
+    @Query(PRODUCT_SUMMARIES)
     fun findProductSummaries(): List<VGProductSummary>
+
+    // The product list's row for one product
+    @Query("$PRODUCT_SUMMARIES AND p.productId = :productId")
+    fun findProductSummary(productId: String): VGProductSummary?
 
     // Score and grade of the most recent review of each of the given products
     @Query(
@@ -50,6 +44,18 @@ interface VGReviewRepository : JpaRepository<VGReview, Long> {
         """
     )
     fun findLatestRatings(productIds: Collection<String>): List<VGRating>
+
+    companion object {
+        private const val PRODUCT_SUMMARIES = """
+            SELECT new no.isys.wineforall.repository.VGProductSummary(
+                p.productId, p.productShortName, p.productTypeName, p.subProductTypeName, p.country,
+                p.regionDetailed, p.volume, p.price, p.vmpPrice, p.vmpVintage, p.discontinued,
+                r.score, r.grade, r.vintage, r.reviewedAt,
+                (SELECT COUNT(r2) FROM VGReview r2 WHERE r2.product = p))
+            FROM VGReview r JOIN r.product p
+            WHERE r.id = (SELECT MAX(r3.id) FROM VGReview r3 WHERE r3.product = p)
+            """
+    }
 }
 
 data class VGRating(

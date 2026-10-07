@@ -329,7 +329,12 @@ export function InventoryItemPicker({
                     {item.category} · {item.price.toFixed(0)} kr
                   </div>
                 </div>
-                <VgRating score={item.vgScore} grade={item.vgGrade} style={{ flexShrink: 0 }} />
+                {item.vgScore != null && (
+                  // Stops the row's mousedown, which would pick the bottle and close the list before the click
+                  <span onMouseDown={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
+                    <VgRating productId={item.vinmonopoletCode} score={item.vgScore} grade={item.vgGrade} />
+                  </span>
+                )}
               </div>
             ))}
           </div>

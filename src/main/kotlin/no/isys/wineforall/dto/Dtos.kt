@@ -279,7 +279,32 @@ data class WineReviewDto(
     val authorDescription: String?,
     val price: Double?,
     val articleUrl: String?,
-    val reviewedAt: Instant
+    val reviewedAt: Instant,
+    val colour: String?,
+    val odour: String?,
+    val taste: String?,
+    // Percent
+    val alcoholLevel: Double?,
+    // Grams per litre, as VG writes it: "< 3", "8,0"
+    val sugarContent: String?,
+    // Taste profile on Vinmonopolet's 0–12 scale. VG's feed also has bitterness, barrel, spice and fruit,
+    // but they are 0 or missing on every review, so they're left out.
+    val fullness: Int?,
+    val freshness: Int?,
+    val tannins: Int?,
+    val sweetness: Int?
+)
+
+// One product with all its reviews, for the product page
+data class WineProductDetailDto(
+    // The same row the product list shows
+    val product: WineProductDto,
+    val grape: String?,
+    val subRegion: String?,
+    // Vinmonopolet lists the product as "Utgått". The product list leaves these out unless Horten has some.
+    val discontinued: Boolean,
+    // Most recent first
+    val reviews: List<WineReviewDto>
 )
 
 data class WineReviewSyncResultDto(

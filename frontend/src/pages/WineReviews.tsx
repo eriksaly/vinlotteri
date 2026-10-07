@@ -6,6 +6,7 @@ import { useAuth } from '../App'
 import NavBar from '../components/NavBar'
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect'
 import { Terningkast } from '../components/Terningkast'
+import { formatVolume, HortenStock, twoDecimals } from '../components/WineProductInfo'
 
 type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
 type SortDir = 'asc' | 'desc'
@@ -24,18 +25,6 @@ const SORT_VALUE: Record<SortKey, (p: WineProduct) => string | number | null> = 
 // Text A–Z, smallest, cheapest and best value first; stock and rating highest first
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: 'asc', country: 'asc', region: 'asc', volume: 'asc', price: 'asc', pricePerScore: 'asc', stock: 'desc', score: 'desc',
-}
-
-// Created once: toLocaleString with options builds a new formatter on every call, which adds up
-// over ~950 rows on every render
-const centilitres = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 1 })
-const litresFormat = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 })
-const twoDecimals = new Intl.NumberFormat('nb-NO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const dateTime = new Intl.DateTimeFormat('nb-NO', { dateStyle: 'short', timeStyle: 'short' })
-
-// 0.75 → "75 cl", 1.5 → "1,5 l"
-function formatVolume(litres: number) {
-  return litres < 1 ? `${centilitres.format(litres * 100)} cl` : `${litresFormat.format(litres)} l`
 }
 
 // hasOwnProperty rather than `in`, which also accepts inherited keys like "constructor"
@@ -511,19 +500,8 @@ const ProductRow = memo(function ProductRow({ p, expanded, reviews, onToggle }: 
         <td style={{ textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           {p.pricePerScore != null ? twoDecimals.format(p.pricePerScore) : '—'}
         </td>
-        <td
-          style={{ textAlign: 'right', whiteSpace: 'nowrap' }}
-          title={p.stockCheckedAt
-            ? `Sjekket ${dateTime.format(new Date(p.stockCheckedAt))}`
-            : 'Ikke sjekket ennå'}
-        >
-          {p.inStock == null ? (
-            <span style={{ color: 'var(--text-muted)' }}>—</span>
-          ) : p.inStock ? (
-            <span className="badge badge-green">{p.hortenStock != null ? `${p.hortenStock} stk` : 'På lager'}</span>
-          ) : (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Ikke på lager</span>
-          )}
+        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <HortenStock p={p} />
         </td>
         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
           <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{p.score}</span>

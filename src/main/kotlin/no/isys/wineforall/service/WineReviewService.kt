@@ -1,12 +1,15 @@
 package no.isys.wineforall.service
 
 import jakarta.persistence.EntityManager
+import no.isys.wineforall.dto.WineProductDetailDto
 import no.isys.wineforall.dto.WineProductDto
 import no.isys.wineforall.dto.WineReviewDto
 import no.isys.wineforall.dto.WineReviewSyncResultDto
 import no.isys.wineforall.model.VGProduct
 import no.isys.wineforall.model.VGReview
+import no.isys.wineforall.model.VmpHortenProduct
 import no.isys.wineforall.repository.VGProductRepository
+import no.isys.wineforall.repository.VGProductSummary
 import no.isys.wineforall.repository.VGReviewRepository
 import no.isys.wineforall.service.VGWineReviewClient.VGWineReview
 import org.springframework.stereotype.Service
@@ -54,36 +57,56 @@ class WineReviewService(
         return reviewRepo.findProductSummaries().mapNotNull { p ->
             val stock = hortenStock[p.productId]
             if (p.discontinued && stock == null) return@mapNotNull null
-            // Most recent price first: Horten's listing from last night, then the weekly discontinued
-            // check, then VG's price from the time of the review
-            val price = stock?.price ?: p.vmpPrice ?: p.price
-            WineProductDto(
-                productId = p.productId,
-                productShortName = p.productShortName,
-                productTypeName = p.productTypeName,
-                subProductTypeName = p.subProductTypeName,
-                country = p.country,
-                regionDetailed = p.regionDetailed,
-                volume = p.volume,
-                price = price,
-                // VG's price_per_score formula, but from the current price rather than the one at review time
-                pricePerScore = if (price != null && p.volume != null && p.volume > 0) price / p.volume / p.score else null,
-                inStock = if (lastStockCheck == null) null else stock != null,
-                hortenStock = stock?.hortenStock,
-                stockCheckedAt = stock?.stockCheckedAt ?: lastStockCheck,
-                score = p.score,
-                grade = p.grade,
-                vintage = p.vintage,
-                // Horten's listing when Horten has the product (null there means non-vintage), otherwise the
-                // weekly discontinued check
-                vmpVintage = if (stock != null) stock.vintage else p.vmpVintage,
-                reviewCount = p.reviewCount.toInt(),
-                lastReviewedAt = p.reviewedAt,
-                // The list shows 40 px thumbnails, so the 300x300 image (~4 KB) rather than 1200x1200 (~30 KB)
-                imageUrl = "https://bilder.vinmonopolet.no/cache/300x300-0/${p.productId}-1.jpg",
-                vinmonopoletUrl = "https://www.vinmonopolet.no/p/${p.productId}"
-            )
+            // The list shows 40 px thumbnails, so the 300x300 image (~4 KB) rather than 1200x1200 (~30 KB)
+            p.toDto(stock, lastStockCheck, imageSize = 300)
         }
+    }
+
+    // One product with all its reviews. Unlike the list, this includes discontinued products.
+    @Transactional(readOnly = true)
+    fun getProduct(productId: String): WineProductDetailDto? {
+        val summary = reviewRepo.findProductSummary(productId) ?: return null
+        val product = productRepo.findById(productId).orElseThrow()
+        val stock = hortenStockService.get(productId)
+        return WineProductDetailDto(
+            product = summary.toDto(stock, hortenStockService.getLastStockCheck(), imageSize = 1200),
+            grape = product.grape,
+            subRegion = product.subRegion,
+            discontinued = product.discontinued,
+            reviews = getReviews(productId)
+        )
+    }
+
+    // Products missing from the Horten table were out of stock at its last check (lastStockCheck)
+    private fun VGProductSummary.toDto(stock: VmpHortenProduct?, lastStockCheck: Instant?, imageSize: Int): WineProductDto {
+        // Most recent price first: Horten's listing from last night, then the weekly discontinued
+        // check, then VG's price from the time of the review
+        val currentPrice = stock?.price ?: vmpPrice ?: price
+        return WineProductDto(
+            productId = productId,
+            productShortName = productShortName,
+            productTypeName = productTypeName,
+            subProductTypeName = subProductTypeName,
+            country = country,
+            regionDetailed = regionDetailed,
+            volume = volume,
+            price = currentPrice,
+            // VG's price_per_score formula, but from the current price rather than the one at review time
+            pricePerScore = if (currentPrice != null && volume != null && volume > 0) currentPrice / volume / score else null,
+            inStock = if (lastStockCheck == null) null else stock != null,
+            hortenStock = stock?.hortenStock,
+            stockCheckedAt = stock?.stockCheckedAt ?: lastStockCheck,
+            score = score,
+            grade = grade,
+            vintage = vintage,
+            // Horten's listing when Horten has the product (null there means non-vintage), otherwise the
+            // weekly discontinued check
+            vmpVintage = if (stock != null) stock.vintage else vmpVintage,
+            reviewCount = reviewCount.toInt(),
+            lastReviewedAt = reviewedAt,
+            imageUrl = "https://bilder.vinmonopolet.no/cache/${imageSize}x$imageSize-0/$productId-1.jpg",
+            vinmonopoletUrl = "https://www.vinmonopolet.no/p/$productId"
+        )
     }
 
     // Products where some review's headline or text contains every word in `text`, ignoring case.
@@ -115,7 +138,16 @@ class WineReviewService(
                 articleUrl = r.article?.takeIf { it.isNotBlank() }?.let {
                     if (it.startsWith("http")) it else "https://www.vg.no/i/$it"
                 },
-                reviewedAt = r.reviewedAt
+                reviewedAt = r.reviewedAt,
+                colour = r.colour,
+                odour = r.odour,
+                taste = r.taste,
+                alcoholLevel = r.alcoholLevel,
+                sugarContent = r.sugarContent,
+                fullness = r.fullness,
+                freshness = r.freshness,
+                tannins = r.tannins,
+                sweetness = r.sweetness
             )
         }
 

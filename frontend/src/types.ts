@@ -204,6 +204,28 @@ export interface WineReview {
   price: number | null
   articleUrl: string | null
   reviewedAt: string
+  colour: string | null
+  odour: string | null
+  taste: string | null
+  alcoholLevel: number | null
+  // Grams per litre, as VG writes it: "< 3", "8,0"
+  sugarContent: string | null
+  // Taste profile on Vinmonopolet's 0–12 scale
+  fullness: number | null
+  freshness: number | null
+  tannins: number | null
+  sweetness: number | null
+}
+
+export interface WineProductDetail {
+  // The same row the product list shows
+  product: WineProduct
+  grape: string | null
+  subRegion: string | null
+  // Vinmonopolet lists the product as "Utgått"
+  discontinued: boolean
+  // Most recent first
+  reviews: WineReview[]
 }
 
 export interface WineReviewSyncResult {
