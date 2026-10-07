@@ -7,6 +7,7 @@ import NavBar from '../components/NavBar'
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect'
 import { Terningkast } from '../components/Terningkast'
 import { formatVolume, HortenStock, twoDecimals } from '../components/WineProductInfo'
+import { PHONE_QUERY, useMediaQuery } from '../useMediaQuery'
 
 type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
 type SortDir = 'asc' | 'desc'
@@ -21,6 +22,12 @@ const SORT_VALUE: Record<SortKey, (p: WineProduct) => string | number | null> = 
   stock: p => p.inStock == null ? null : p.inStock ? p.hortenStock ?? 1 : 0,
   score: p => p.score,
 }
+
+// Column headers, and the sort dropdown that replaces them on phones
+const SORT_LABEL: Record<SortKey, string> = {
+  name: 'Navn', country: 'Land', region: 'Region', volume: 'Volum', price: 'Pris', pricePerScore: 'Pris/poeng', stock: 'Horten', score: 'Vurdering',
+}
+const PRICE_PER_SCORE_HINT = 'Literpris delt på poeng. Lavere er bedre kjøp.'
 
 // Text A–Z, smallest, cheapest and best value first; stock and rating highest first
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
@@ -121,6 +128,7 @@ export default function WineReviews() {
 function WineReviewList() {
   // Syncing from VG is admin-only
   const isAdmin = useAuth().user?.role === 'ADMIN'
+  const phone = useMediaQuery(PHONE_QUERY)
   // Filters and sorting are kept in the query string so a reload keeps them. The inputs work on local
   // state, which is mirrored into the URL, rather than reading the URL directly.
   const [params, setParams] = useSearchParams()
@@ -301,13 +309,13 @@ function WineReviewList() {
   if (loading) return <div className="card"><div className="card-body">Henter vinanmeldelser...</div></div>
 
   const reviewTotal = products.reduce((sum, p) => sum + p.reviewCount, 0)
-  const sortHeader = (k: SortKey, label: string, align?: 'right', title?: string) => (
+  const sortHeader = (k: SortKey, align?: 'right', title?: string) => (
     <th
       title={title}
       onClick={() => toggleSort(k)}
       style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: align, color: sort.key === k ? 'var(--wine)' : undefined }}
     >
-      {label} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+      {SORT_LABEL[k]} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
     </th>
   )
 
@@ -431,20 +439,51 @@ function WineReviewList() {
           <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
             Ingen treff.
           </div>
+        ) : phone ? (
+          // The table needs ~1000 px, so phones get a list instead, sorted from a dropdown
+          <>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem',
+              borderBottom: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)',
+            }}>
+              <label htmlFor="wine-sort">Sorter etter</label>
+              <select
+                id="wine-sort"
+                className="form-control"
+                style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
+                value={sort.key}
+                onChange={e => { const key = e.target.value as SortKey; updateFilters({ sort: { key, dir: DEFAULT_DIR[key] } }) }}
+              >
+                {(Object.keys(SORT_LABEL) as SortKey[]).map(k => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+              </select>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => toggleSort(sort.key)} title="Snu rekkefølgen">
+                {sort.dir === 'asc' ? '▲ Stigende' : '▼ Synkende'}
+              </button>
+            </div>
+            {visible.map(p => (
+              <PhoneProductRow
+                key={p.productId}
+                p={p}
+                expanded={expandedId === p.productId}
+                reviews={reviews[p.productId]}
+                onToggle={onToggleExpand}
+              />
+            ))}
+          </>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table" style={{ margin: 0 }}>
               <thead>
                 <tr>
                   <th style={{ width: 56 }}></th>
-                  {sortHeader('name', 'Navn')}
-                  {sortHeader('country', 'Land')}
-                  {sortHeader('region', 'Region')}
-                  {sortHeader('volume', 'Volum', 'right')}
-                  {sortHeader('price', 'Pris', 'right')}
-                  {sortHeader('pricePerScore', 'Pris/poeng', 'right', 'Literpris delt på poeng. Lavere er bedre kjøp.')}
-                  {sortHeader('stock', 'Horten', 'right')}
-                  {sortHeader('score', 'Vurdering', 'right')}
+                  {sortHeader('name')}
+                  {sortHeader('country')}
+                  {sortHeader('region')}
+                  {sortHeader('volume', 'right')}
+                  {sortHeader('price', 'right')}
+                  {sortHeader('pricePerScore', 'right', PRICE_PER_SCORE_HINT)}
+                  {sortHeader('stock', 'right')}
+                  {sortHeader('score', 'right')}
                 </tr>
               </thead>
               <tbody>
@@ -526,6 +565,57 @@ const ProductRow = memo(function ProductRow({ p, expanded, reviews, onToggle }: 
         </tr>
       )}
     </Fragment>
+  )
+})
+
+// ProductRow for phones: the same information stacked under the name instead of in columns
+const PhoneProductRow = memo(function PhoneProductRow({ p, expanded, reviews, onToggle }: {
+  p: WineProduct
+  expanded: boolean
+  reviews: WineReview[] | undefined
+  onToggle: (productId: string) => void
+}) {
+  const place = [p.country, p.regionDetailed, p.volume != null ? formatVolume(p.volume) : null].filter(Boolean).join(' · ')
+  const muted: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' }
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
+      <div onClick={() => onToggle(p.productId)} style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', cursor: 'pointer' }}>
+        <img
+          src={p.imageUrl}
+          alt=""
+          loading="lazy"
+          style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
+          onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 500 }}>{p.productShortName ?? 'Ukjent navn'}</div>
+          <div style={muted}>
+            <a href={p.vinmonopoletUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>#{p.productId}</a>
+            {p.productTypeName && ` · ${p.productTypeName}`}
+            <Vintages current={p.vmpVintage} reviewed={p.vintage} />
+          </div>
+          {place && <div style={muted}>{place}</div>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', marginTop: '0.2rem' }}>
+            {p.price != null && <span style={{ whiteSpace: 'nowrap', fontSize: '0.9rem' }}>{p.price.toFixed(2)} kr</span>}
+            {p.pricePerScore != null && (
+              <span style={{ ...muted, whiteSpace: 'nowrap' }} title={PRICE_PER_SCORE_HINT}>Pris/poeng {twoDecimals.format(p.pricePerScore)}</span>
+            )}
+            {p.inStock != null && <span style={{ ...muted, whiteSpace: 'nowrap' }}>Horten <HortenStock p={p} /></span>}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{p.score}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}> p</span>
+          <Terningkast grade={p.grade} size={24} style={{ marginLeft: '0.35rem' }} />
+          {p.reviewCount > 1 && <div style={muted}>{p.reviewCount} anm. {expanded ? '▴' : '▾'}</div>}
+        </div>
+      </div>
+      {expanded && (
+        <div style={{ background: 'var(--bg)', padding: '0.75rem' }}>
+          {reviews ? <ReviewList reviews={reviews} /> : <span style={{ color: 'var(--text-muted)' }}>Henter anmeldelser...</span>}
+        </div>
+      )}
+    </div>
   )
 })
 
