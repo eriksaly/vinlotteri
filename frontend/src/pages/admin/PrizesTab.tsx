@@ -4,6 +4,12 @@ import type { LotteryInfo, LotteryPrize, InventoryItem } from '../../types'
 import { InventoryItemPicker, ImageLightbox } from './shared'
 import { VgRating } from '../../components/Terningkast'
 
+// Shared by the prize count input and the buttons next to it, so they line up
+const CONTROL_HEIGHT = 38
+// Bottle thumbnails in the prize list, and the space between a thumbnail and its name
+const THUMB_SIZE = 40
+const THUMB_GAP = 10
+
 
 export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) {
   const [prizes, setPrizes] = useState<LotteryPrize[]>([])
@@ -201,39 +207,43 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
       <div className="card">
         <div className="card-header">Antall premier</div>
         <div className="card-body">
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Premier i trekningen</label>
+          {/* The label sits above the row so the input, buttons and count all centre on one line, also when
+              the row wraps on narrow screens. The fixed height evens out the buttons: the emoji in some
+              labels would otherwise make those buttons taller. */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="prize-slot-count">Premier i trekningen</label>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <input
+                id="prize-slot-count"
                 className="form-control"
                 type="number"
                 min={1}
                 max={100}
-                style={{ width: 80 }}
+                style={{ width: 80, height: CONTROL_HEIGHT }}
                 value={slotCount}
                 onChange={e => setSlotCount(e.target.value === '' ? '' : Number(e.target.value))}
               />
+              <button className="btn btn-primary" style={{ height: CONTROL_HEIGHT }} onClick={applySlots} disabled={saving || !slotCount}>
+                {saving ? '⏳' : '✓'} Sett antall
+              </button>
+              {prizes.length > 0 && inventory.length > 0 && (
+                <button className="btn" style={{ height: CONTROL_HEIGHT }} onClick={autoFill} disabled={saving}
+                  title="Fordel lagerflasker automatisk etter kategori-rekkefølge: øl → hvitvin/rosé → rødvin/musserende → brennevin">
+                  🪄 Auto-fyll
+                </button>
+              )}
+              {prizes.some(p => p.items.length > 0 && p.winnerId == null) && (
+                <button className="btn" onClick={clearAll} disabled={saving}
+                  style={{ height: CONTROL_HEIGHT, color: 'var(--text-muted)' }}>
+                  🗑️ Nullstill
+                </button>
+              )}
+              {prizes.length > 0 && (
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {assignedCount}/{prizes.length} tildelt
+                </span>
+              )}
             </div>
-            <button className="btn btn-primary" onClick={applySlots} disabled={saving || !slotCount}>
-              {saving ? '⏳' : '✓'} Sett antall
-            </button>
-            {prizes.length > 0 && inventory.length > 0 && (
-              <button className="btn" onClick={autoFill} disabled={saving}
-                title="Fordel lagerflasker automatisk etter kategori-rekkefølge: øl → hvitvin/rosé → rødvin/musserende → brennevin">
-                🪄 Auto-fyll
-              </button>
-            )}
-            {prizes.some(p => p.items.length > 0 && p.winnerId == null) && (
-              <button className="btn" onClick={clearAll} disabled={saving}
-                style={{ color: 'var(--text-muted)' }}>
-                🗑️ Nullstill
-              </button>
-            )}
-            {prizes.length > 0 && (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
-                {assignedCount}/{prizes.length} tildelt
-              </span>
-            )}
           </div>
           {prizes.length > 0 && unassignedCount > 0 && (
             <p style={{ marginTop: '0.75rem', marginBottom: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -258,7 +268,7 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
               const busy = assigningPos === prize.position
               return (
                 <div key={prize.position} style={{
-                  display: 'flex', gap: '1rem', alignItems: 'flex-start',
+                  display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                   padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)',
                   opacity: prize.winnerId != null ? 0.6 : 1,
                 }}>
@@ -267,45 +277,44 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                     {prize.position}
                   </div>
 
-                  {/* Bottle images */}
-                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                    {prize.items.length > 0 ? prize.items.map(item => (
-                      <img key={item.id} src={item.imageUrl} alt={item.name}
-                        onClick={() => setLightbox({ src: item.imageUrl, alt: item.name })}
-                        title="Klikk for å forstørre"
-                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, cursor: 'zoom-in' }}
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    )) : (
-                      <div style={{ width: 40, height: 40, background: 'var(--surface-raised)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>?</div>
-                    )}
-                  </div>
-
-                  {/* Names + status */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {prize.items.length > 0 ? prize.items.map(item => (
-                      <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 2 }}>
-                        <span style={{ fontWeight: 500, fontSize: '0.88rem' }}>{item.name}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{item.price.toFixed(0)} kr</span>
-                        <VgRating productId={item.vinmonopoletCode} score={item.vgScore} grade={item.vgGrade} style={{ fontSize: '0.8rem' }} />
-                        {prize.winnerId == null && (
-                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '0 2px' }}
-                            disabled={busy}
-                            onClick={() => {
-                              let skipped = false
-                              assignItems(prize.position, prize.items.flatMap(i => {
-                                if (i.id === item.id && !skipped) { skipped = true; return [] }
-                                return [i.id]
-                              }))
-                            }}>
-                            ✕
-                          </button>
-                        )}
+                  {/* One line per bottle: its image, then its name, price and rating, which wrap under the name
+                      on narrow screens */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {prize.items.length > 0 ? prize.items.map((item, idx) => (
+                      <div key={`${item.id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: THUMB_GAP }}>
+                        <img src={item.imageUrl} alt={item.name}
+                          onClick={() => setLightbox({ src: item.imageUrl, alt: item.name })}
+                          title="Klikk for å forstørre"
+                          style={{ width: THUMB_SIZE, height: THUMB_SIZE, objectFit: 'contain', borderRadius: 4, cursor: 'zoom-in', flexShrink: 0 }}
+                          onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.5rem' }}>
+                          <span style={{ fontWeight: 500, fontSize: '0.88rem' }}>{item.name}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{item.price.toFixed(0)} kr</span>
+                          <VgRating productId={item.vinmonopoletCode} score={item.vgScore} grade={item.vgGrade} style={{ fontSize: '0.8rem' }} />
+                          {prize.winnerId == null && (
+                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '0 2px' }}
+                              disabled={busy}
+                              onClick={() => {
+                                let skipped = false
+                                assignItems(prize.position, prize.items.flatMap(i => {
+                                  if (i.id === item.id && !skipped) { skipped = true; return [] }
+                                  return [i.id]
+                                }))
+                              }}>
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )) : (
-                      <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>Ikke tildelt</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: THUMB_GAP }}>
+                        <div style={{ width: THUMB_SIZE, height: THUMB_SIZE, flexShrink: 0, background: 'var(--surface-raised)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>?</div>
+                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.88rem' }}>Ikke tildelt</span>
+                      </div>
                     )}
                     {prize.items.length > 1 && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      // Lined up with the names above
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: THUMB_SIZE + THUMB_GAP }}>
                         Totalt {totalPrice.toFixed(0)} kr
                       </div>
                     )}

@@ -148,26 +148,22 @@ const CATEGORY_CHIPS: { key: string; label: string; categories: string[] }[] = [
   { key: 'spirit',   label: '🥃 Sprit',      categories: ['brennevin', 'gin', 'whisky', 'whiskey', 'akevitt', 'druebrennevin', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac', 'likør'] },
 ]
 
+// A "+" button that opens a searchable list of the inventory, for adding a bottle to a prize
 export function InventoryItemPicker({
   items,
   onSelect,
   disabled,
-  placeholder = '+ Legg til flaske',
-  width = 240,
 }: {
   items: InventoryItem[]
   onSelect: (id: number) => void
   disabled?: boolean
-  placeholder?: string
-  width?: number
 }) {
   const [value, setValue] = useState('')
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const q = value.trim().toLowerCase()
@@ -190,8 +186,9 @@ export function InventoryItemPicker({
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
-      if (containerRef.current?.contains(target)) return
+      if (buttonRef.current?.contains(target)) return
       if (dropdownRef.current?.contains(target)) return
+      setValue('')
       setOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -201,7 +198,7 @@ export function InventoryItemPicker({
   useLayoutEffect(() => {
     if (!open) return
     const update = () => {
-      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect())
+      if (buttonRef.current) setAnchorRect(buttonRef.current.getBoundingClientRect())
     }
     update()
     window.addEventListener('scroll', update, true)
@@ -212,34 +209,39 @@ export function InventoryItemPicker({
     }
   }, [open])
 
-  const select = (i: InventoryItem) => {
-    onSelect(i.id)
+  const close = () => {
     setValue('')
     setOpen(false)
-    inputRef.current?.blur()
+    buttonRef.current?.focus()
+  }
+
+  const select = (i: InventoryItem) => {
+    onSelect(i.id)
+    close()
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (!open) { if (e.key === 'ArrowDown' || e.key === 'Enter') setOpen(true); return }
     if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(i => Math.min(i + 1, filtered.length - 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(i => Math.max(i - 1, 0)) }
     else if (e.key === 'Enter') { e.preventDefault(); if (filtered[highlighted]) select(filtered[highlighted]) }
-    else if (e.key === 'Escape') { e.preventDefault(); setOpen(false) }
+    else if (e.key === 'Escape') { e.preventDefault(); close() }
   }
 
-  const DROPDOWN_W = Math.max(width, 300)
-  const DROPDOWN_MAX_H = 360
-  let dropdownTop = 0
+  // Narrower than 300 px only on the smallest phones
+  const DROPDOWN_W = Math.min(300, window.innerWidth - 16)
+  const DROPDOWN_MAX_H = 400
+  // Opening upward, the list is placed by its bottom edge so a short list still sits right above the button
+  let verticalPosition: React.CSSProperties = {}
   let dropdownLeft = 0
   let openUpward = false
   if (anchorRect) {
     const spaceBelow = window.innerHeight - anchorRect.bottom
     const spaceAbove = anchorRect.top
-    openUpward = spaceBelow < 220 && spaceAbove > spaceBelow
-    dropdownTop = openUpward
-      ? Math.max(8, anchorRect.top - DROPDOWN_MAX_H - 2)
-      : anchorRect.bottom + 2
-    // Prefer right-aligning to the input; clamp into viewport
+    openUpward = spaceBelow < 260 && spaceAbove > spaceBelow
+    verticalPosition = openUpward
+      ? { bottom: window.innerHeight - anchorRect.top + 2 }
+      : { top: anchorRect.bottom + 2 }
+    // Prefer right-aligning to the button; clamp into viewport
     dropdownLeft = Math.min(
       Math.max(8, anchorRect.right - DROPDOWN_W),
       window.innerWidth - DROPDOWN_W - 8,
@@ -248,59 +250,76 @@ export function InventoryItemPicker({
   const maxHeightActual = anchorRect
     ? Math.min(DROPDOWN_MAX_H, openUpward ? anchorRect.top - 16 : window.innerHeight - anchorRect.bottom - 16)
     : DROPDOWN_MAX_H
+  // On touch screens a focused search field brings up the keyboard, which would cover the list
+  const focusSearch = !window.matchMedia('(pointer: coarse)').matches
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width }}>
-      <input
-        ref={inputRef}
-        className="form-control"
-        style={{ fontSize: '0.8rem', padding: '0.25rem 0.45rem', width: '100%' }}
-        placeholder={placeholder}
-        value={value}
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="btn btn-outline"
+        style={{ width: 30, height: 30, padding: 0, justifyContent: 'center', fontSize: '1.2rem', lineHeight: 1 }}
+        title="Legg til flaske"
+        aria-label="Legg til flaske"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         disabled={disabled}
-        onChange={e => { setValue(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKey}
-        autoComplete="off"
-      />
+        onClick={() => open ? close() : setOpen(true)}
+      >
+        +
+      </button>
       {open && anchorRect && createPortal(
         <div
           ref={dropdownRef}
           style={{
             position: 'fixed', zIndex: 1000,
-            top: dropdownTop, left: dropdownLeft, width: DROPDOWN_W,
+            ...verticalPosition, left: dropdownLeft, width: DROPDOWN_W,
             background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.18)', maxHeight: maxHeightActual,
             display: 'flex', flexDirection: 'column',
           }}
         >
           <div
-            onMouseDown={e => e.preventDefault()}
             style={{
-              display: 'flex', flexWrap: 'wrap', gap: 4,
-              padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)',
+              display: 'flex', flexDirection: 'column', gap: '0.4rem',
+              padding: '0.5rem', borderBottom: '1px solid var(--border)',
               background: 'var(--bg)',
             }}
           >
-            <button
-              type="button"
-              onClick={() => setActiveChip(null)}
-              style={chipStyle(activeChip === null)}
-            >
-              Alle
-            </button>
-            {CATEGORY_CHIPS.map(c => (
+            <input
+              className="form-control"
+              style={{ fontSize: '0.85rem', padding: '0.35rem 0.55rem' }}
+              placeholder="Søk etter flaske..."
+              value={value}
+              autoFocus={focusSearch}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={handleKey}
+              autoComplete="off"
+              aria-label="Søk etter flaske"
+            />
+            {/* preventDefault keeps the focus in the search field */}
+            <div onMouseDown={e => e.preventDefault()} style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               <button
-                key={c.key}
                 type="button"
-                onClick={() => setActiveChip(activeChip === c.key ? null : c.key)}
-                style={chipStyle(activeChip === c.key)}
+                onClick={() => setActiveChip(null)}
+                style={chipStyle(activeChip === null)}
               >
-                {c.label}
+                Alle
               </button>
-            ))}
+              {CATEGORY_CHIPS.map(c => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setActiveChip(activeChip === c.key ? null : c.key)}
+                  style={chipStyle(activeChip === c.key)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div role="listbox" aria-label="Flasker på lager" style={{ overflowY: 'auto', flex: 1 }}>
             {filtered.length === 0 ? (
               <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Ingen treff
@@ -308,6 +327,8 @@ export function InventoryItemPicker({
             ) : filtered.map((item, i) => (
               <div
                 key={item.id}
+                role="option"
+                aria-selected={i === highlighted}
                 onMouseDown={e => { e.preventDefault(); select(item) }}
                 onMouseEnter={() => setHighlighted(i)}
                 style={{
@@ -341,7 +362,7 @@ export function InventoryItemPicker({
         </div>,
         document.body,
       )}
-    </div>
+    </>
   )
 }
 
