@@ -161,3 +161,13 @@ a:hover { text-decoration: underline; }
 .qty-btn { width: 32px; height: 32px; border: 1.5px solid var(--border); border-radius: 6px; background: white; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
 .qty-btn:hover { border-color: var(--wine); color: var(--wine); }
 .qty-value { font-weight: 700; min-width: 2rem; text-align: center; }
+
+/* Phones: the desktop gutters and card padding would take up almost a third of the screen width */
+@media (max-width: 600px) {
+  .container { padding: 0 0.5rem; }
+  .nav-inner { padding: 0 0.5rem; }
+  .card-header { padding: 0.9rem 0.75rem; }
+  .card-body { padding: 0.75rem; }
+  /* The admin tab bar runs to the screen edges: cancels the container's gutter above */
+  .tabs { margin-left: -0.5rem; margin-right: -0.5rem; }
+}
