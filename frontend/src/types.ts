@@ -49,6 +49,9 @@ export interface InventoryItem {
   country: string
   imageUrl: string
   createdAt: string
+  // Points and terningkast from VG's most recent review; null when VG hasn't reviewed the product
+  vgScore: number | null
+  vgGrade: number | null
 }
 
 export interface LotteryPrize {

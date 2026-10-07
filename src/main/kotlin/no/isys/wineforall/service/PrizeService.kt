@@ -10,6 +10,7 @@ import no.isys.wineforall.model.Winner
 import no.isys.wineforall.repository.InventoryItemRepository
 import no.isys.wineforall.repository.LotteryPrizeRepository
 import no.isys.wineforall.repository.LotteryRepository
+import no.isys.wineforall.repository.VGRating
 import no.isys.wineforall.repository.WinnerRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,7 +27,7 @@ class PrizeService(
     fun getPrizesForCurrentLottery(): List<LotteryPrizeDto> {
         val lottery = getCurrentActiveOrDrawingLottery() ?: return emptyList()
         val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
-        return prizeRepo.findAllByLotteryOrderByPosition(lottery).map { it.toDto(winners) }
+        return prizeRepo.findAllByLotteryOrderByPosition(lottery).toDtos(winners)
     }
 
     @Transactional
@@ -56,7 +57,7 @@ class PrizeService(
         lotteryRepo.save(lottery)
 
         val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
-        return prizeRepo.findAllByLotteryOrderByPosition(lottery).map { it.toDto(winners) }
+        return prizeRepo.findAllByLotteryOrderByPosition(lottery).toDtos(winners)
     }
 
     @Transactional
@@ -75,7 +76,7 @@ class PrizeService(
         }
         prizeRepo.save(prize)
         val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
-        return prize.toDto(winners)
+        return listOf(prize).toDtos(winners).single()
     }
 
     fun getPrizeAtPosition(lottery: Lottery, position: Int): LotteryPrize? =
@@ -85,13 +86,20 @@ class PrizeService(
         lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.OPEN)
             ?: lotteryRepo.findFirstByStatusOrderByCreatedAtDesc(LotteryStatus.DRAWING)
 
-    private fun LotteryPrize.toDto(winners: List<Winner>): LotteryPrizeDto {
+    // Looks up VG's ratings for all the prizes' items in one query
+    private fun List<LotteryPrize>.toDtos(winners: List<Winner>): List<LotteryPrizeDto> {
+        val ratings = inventoryService.getVGRatings(flatMap { prize -> prize.slots.map { it.inventoryItem } })
+        return map { it.toDto(winners, ratings) }
+    }
+
+    private fun LotteryPrize.toDto(winners: List<Winner>, ratings: Map<String, VGRating>): LotteryPrizeDto {
         val winnerId = winners.find { it.prize?.id == this.id }?.id
         return LotteryPrizeDto(
             id = id,
             position = position,
             items = slots.flatMap { slot ->
-                List(slot.quantity) { with(inventoryService) { slot.inventoryItem.toDto() } }
+                val rating = ratings[slot.inventoryItem.vinmonopoletCode]
+                List(slot.quantity) { with(inventoryService) { slot.inventoryItem.toDto(rating = rating) } }
             },
             winnerId = winnerId
         )

@@ -5,6 +5,7 @@ import type { WineProduct, WineReview, WineReviewSyncResult } from '../types'
 import { useAuth } from '../App'
 import NavBar from '../components/NavBar'
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect'
+import { Terningkast } from '../components/Terningkast'
 
 type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
 type SortDir = 'asc' | 'desc'
@@ -583,20 +584,5 @@ function ReviewList({ reviews }: { reviews: WineReview[] }) {
         </div>
       ))}
     </div>
-  )
-}
-
-// VG's terningkast dice, served from public/terningkast/1.svg–6.svg
-function Terningkast({ grade, size, style }: { grade: number; size: number; style?: React.CSSProperties }) {
-  if (grade < 1 || grade > 6) return <span style={style}>{grade}</span>
-  return (
-    <img
-      src={`/terningkast/${grade}.svg`}
-      alt={`Terningkast ${grade}`}
-      title={`Terningkast ${grade}`}
-      width={size}
-      height={size}
-      style={{ verticalAlign: 'middle', ...style }}
-    />
   )
 }

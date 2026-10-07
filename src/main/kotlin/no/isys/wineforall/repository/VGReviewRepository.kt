@@ -39,7 +39,24 @@ interface VGReviewRepository : JpaRepository<VGReview, Long> {
         """
     )
     fun findProductSummaries(): List<VGProductSummary>
+
+    // Score and grade of the most recent review of each of the given products
+    @Query(
+        """
+        SELECT new no.isys.wineforall.repository.VGRating(p.productId, r.score, r.grade)
+        FROM VGReview r JOIN r.product p
+        WHERE p.productId IN :productIds
+          AND r.id = (SELECT MAX(r2.id) FROM VGReview r2 WHERE r2.product = p)
+        """
+    )
+    fun findLatestRatings(productIds: Collection<String>): List<VGRating>
 }
+
+data class VGRating(
+    val productId: String,
+    val score: Int,
+    val grade: Int
+)
 
 data class VGProductSummary(
     val productId: String,

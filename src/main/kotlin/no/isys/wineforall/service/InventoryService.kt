@@ -8,6 +8,8 @@ import no.isys.wineforall.model.InventoryItem
 import no.isys.wineforall.repository.InventoryItemRepository
 import no.isys.wineforall.repository.LotteryPrizeRepository
 import no.isys.wineforall.repository.PrizeItemSlotRepository
+import no.isys.wineforall.repository.VGRating
+import no.isys.wineforall.repository.VGReviewRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -15,19 +17,29 @@ import org.springframework.transaction.annotation.Transactional
 class InventoryService(
     private val inventoryRepo: InventoryItemRepository,
     private val prizeRepo: LotteryPrizeRepository,
-    private val slotRepo: PrizeItemSlotRepository
+    private val slotRepo: PrizeItemSlotRepository,
+    private val reviewRepo: VGReviewRepository
 ) {
 
     fun getAll(): List<InventoryItemDto> {
         val assignedCounts = slotRepo.findAllWithItem()
             .groupBy { it.inventoryItem.id }
             .mapValues { (_, slots) -> slots.sumOf { it.quantity } }
-        return inventoryRepo.findAll()
+        val items = inventoryRepo.findAll()
+        val ratings = getVGRatings(items)
+        return items
             .sortedBy { it.createdAt }
             .mapNotNull { item ->
                 val remaining = item.quantity - (assignedCounts[item.id] ?: 0)
-                if (remaining <= 0) null else item.toDto(quantityOverride = remaining)
+                if (remaining <= 0) null else item.toDto(quantityOverride = remaining, rating = ratings[item.vinmonopoletCode])
             }
+    }
+
+    // VG's latest rating of each item VG has reviewed, by varenummer
+    fun getVGRatings(items: Collection<InventoryItem>): Map<String, VGRating> {
+        val codes = items.map { it.vinmonopoletCode }.toSet()
+        if (codes.isEmpty()) return emptyMap()
+        return reviewRepo.findLatestRatings(codes).associateBy { it.productId }
     }
 
     @Transactional
@@ -82,7 +94,7 @@ class InventoryService(
         }
     }
 
-    fun InventoryItem.toDto(quantityOverride: Int? = null) = InventoryItemDto(
+    fun InventoryItem.toDto(quantityOverride: Int? = null, rating: VGRating? = null) = InventoryItemDto(
         id = id,
         vinmonopoletCode = vinmonopoletCode,
         name = name,
@@ -91,6 +103,8 @@ class InventoryService(
         quantity = quantityOverride ?: quantity,
         country = country,
         imageUrl = "https://bilder.vinmonopolet.no/cache/1200x1200-0/$vinmonopoletCode-1.jpg",
-        createdAt = createdAt
+        createdAt = createdAt,
+        vgScore = rating?.score,
+        vgGrade = rating?.grade
     )
 }

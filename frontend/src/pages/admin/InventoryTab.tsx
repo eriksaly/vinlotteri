@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../../api/client'
 import type { InventoryItem, VinmonopoletProduct } from '../../types'
 import { useConfirm } from './shared'
+import { VgRating } from '../../components/Terningkast'
 
 export default function InventoryTab() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -276,6 +277,7 @@ export default function InventoryTab() {
                   <th>Kategori</th>
                   <th>Land</th>
                   <th style={{ textAlign: 'right' }}>Pris</th>
+                  <th style={{ textAlign: 'right' }} title="Poeng og terningkast fra VGs siste anmeldelse">VG</th>
                   <th style={{ textAlign: 'center' }}>Antall</th>
                   <th style={{ width: 120 }}></th>
                 </tr>
@@ -309,6 +311,7 @@ export default function InventoryTab() {
                           <input className="form-control" style={{ width: 80, textAlign: 'right' }} type="number"
                             value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} />
                         </td>
+                        <td style={{ textAlign: 'right' }}><VgCell item={item} /></td>
                         <td>
                           <input className="form-control" style={{ width: 65, textAlign: 'center', margin: '0 auto' }} type="number" min={0}
                             value={editForm.quantity} onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))} />
@@ -329,6 +332,7 @@ export default function InventoryTab() {
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{item.category}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{item.country || '—'}</td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{item.price.toFixed(2)} kr</td>
+                        <td style={{ textAlign: 'right' }}><VgCell item={item} /></td>
                         <td style={{ textAlign: 'center' }}>{item.quantity}</td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
@@ -347,4 +351,10 @@ export default function InventoryTab() {
       </div>
     </div>
   )
+}
+
+function VgCell({ item }: { item: InventoryItem }) {
+  return item.vgScore != null
+    ? <VgRating score={item.vgScore} grade={item.vgGrade} size={22} />
+    : <span style={{ color: 'var(--text-muted)' }}>—</span>
 }

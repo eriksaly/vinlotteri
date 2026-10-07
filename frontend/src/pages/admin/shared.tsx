@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Participant, InventoryItem } from '../../types'
+import { VgRating } from '../../components/Terningkast'
 
 export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose?: () => void }) {
   return (
@@ -328,6 +329,7 @@ export function InventoryItemPicker({
                     {item.category} · {item.price.toFixed(0)} kr
                   </div>
                 </div>
+                <VgRating score={item.vgScore} grade={item.vgGrade} style={{ flexShrink: 0 }} />
               </div>
             ))}
           </div>

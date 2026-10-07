@@ -112,7 +112,11 @@ data class InventoryItemDto(
     val quantity: Int,
     val country: String,
     val imageUrl: String,
-    val createdAt: Instant
+    val createdAt: Instant,
+    // Points and terningkast from VG's most recent review, when VG has reviewed the product. Only filled
+    // in for the inventory and prize lists.
+    val vgScore: Int? = null,
+    val vgGrade: Int? = null
 )
 
 data class LotteryPrizeDto(

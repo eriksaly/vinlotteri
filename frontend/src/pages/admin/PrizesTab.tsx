@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import type { LotteryInfo, LotteryPrize, InventoryItem } from '../../types'
 import { InventoryItemPicker, ImageLightbox } from './shared'
+import { VgRating } from '../../components/Terningkast'
 
 
 export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) {
@@ -285,6 +286,7 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
                       <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 2 }}>
                         <span style={{ fontWeight: 500, fontSize: '0.88rem' }}>{item.name}</span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{item.price.toFixed(0)} kr</span>
+                        <VgRating score={item.vgScore} grade={item.vgGrade} style={{ fontSize: '0.8rem' }} />
                         {prize.winnerId == null && (
                           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '0 2px' }}
                             disabled={busy}
