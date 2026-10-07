@@ -1,0 +1,294 @@
+{
+  "breadcrumbs": [
+    {
+      "facetCode": "availableInStores",
+      "facetName": "På lager i butikk",
+      "facetValueCode": "237",
+      "facetValueName": "Horten",
+      "removeQuery": {
+        "query": {
+          "value": ":name-asc:availableInStores:233:availableInStores:398"
+        }
+      }
+    },
+    {
+      "facetCode": "availableInStores",
+      "facetName": "På lager i butikk",
+      "facetValueCode": "233",
+      "facetValueName": "Holmestrand",
+      "removeQuery": {
+        "query": {
+          "value": ":name-asc:availableInStores:237:availableInStores:398"
+        }
+      }
+    },
+    {
+      "facetCode": "availableInStores",
+      "facetName": "På lager i butikk",
+      "facetValueCode": "398",
+      "facetValueName": "Stokke",
+      "removeQuery": {
+        "query": {
+          "value": ":name-asc:availableInStores:237:availableInStores:233"
+        }
+      }
+    }
+  ],
+  "pagination": {
+    "currentPage": 0,
+    "pageSize": 24,
+    "sort": "name-asc",
+    "totalPages": 91,
+    "totalResults": 2168
+  },
+  "products": [
+    {
+      "alcohol": {
+        "formattedValue": "14,5%",
+        "readableValue": "14,5 prosent",
+        "value": 14.5
+      },
+      "buyable": true,
+      "code": "7857701",
+      "district": {
+        "code": "usa_california",
+        "name": "California"
+      },
+      "expired": false,
+      "main_category": {
+        "code": "rødvin",
+        "name": "Rødvin"
+      },
+      "main_country": {
+        "code": "usa",
+        "name": "USA"
+      },
+      "main_sub_category": {},
+      "name": "1000 Stories Bourbon Barrel Aged Zinfandel 2023",
+      "price": {
+        "formattedValue": "Kr 184,90",
+        "readableValue": "184 kroner og 90 øre",
+        "value": 184.9
+      },
+      "productAvailability": {
+        "deliveryAvailability": {
+          "availableForPurchase": true,
+          "infos": [
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "8 på lager",
+              "location": "Post/Levering",
+              "readableValue": "Post/Levering: 8 på lager - flere kan bestilles"
+            }
+          ],
+          "openStockLocator": false
+        },
+        "storesAvailability": {
+          "availableForPurchase": true,
+          "infoAvailabilityAllStores": "Vis butikker med varen på lager",
+          "infos": [
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "18 i butikken",
+              "location": "Horten",
+              "readableValue": "Horten: 18 i butikken - flere kan bestilles"
+            },
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "9 i butikken",
+              "location": "Holmestrand",
+              "readableValue": "Holmestrand: 9 i butikken - flere kan bestilles"
+            },
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "13 i butikken",
+              "location": "Stokke",
+              "readableValue": "Stokke: 13 i butikken - flere kan bestilles"
+            }
+          ],
+          "openStockLocator": true
+        }
+      },
+      "product_selection": "Basisutvalget",
+      "releaseMode": false,
+      "status": "aktiv",
+      "sub_District": {
+        "code": "usa_california_mendocino",
+        "name": "Mendocino"
+      },
+      "sustainable": true,
+      "url": "/Land/USA/California/Mendocino/1000-Stories-Bourbon-Barrel-Aged-Zinfandel-2023/p/7857701",
+      "volume": {
+        "formattedValue": "75 cl",
+        "readableValue": "75 centiliter",
+        "value": 75.0
+      }
+    },
+    {
+      "alcohol": {
+        "formattedValue": "12,5%",
+        "readableValue": "12,5 prosent",
+        "value": 12.5
+      },
+      "buyable": true,
+      "code": "13045101",
+      "district": {
+        "code": "italia_lombardia",
+        "name": "Lombardia"
+      },
+      "expired": false,
+      "main_category": {
+        "code": "musserende_vin",
+        "name": "Musserende vin"
+      },
+      "main_country": {
+        "code": "italia",
+        "name": "Italia"
+      },
+      "main_sub_category": {
+        "code": "musserende_vin_musserende_vin",
+        "name": "Musserende vin"
+      },
+      "name": "1701 Franciacorta Brut Nature",
+      "price": {
+        "formattedValue": "Kr 369,90",
+        "readableValue": "369 kroner og 90 øre",
+        "value": 369.9
+      },
+      "productAvailability": {
+        "deliveryAvailability": {
+          "availableForPurchase": true,
+          "infos": [
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "1 på lager",
+              "location": "Post/Levering",
+              "readableValue": "Post/Levering: 1 på lager - flere kan bestilles"
+            }
+          ],
+          "openStockLocator": false
+        },
+        "storesAvailability": {
+          "availableForPurchase": true,
+          "infoAvailabilityAllStores": "Vis butikker med varen på lager",
+          "infos": [
+            {
+              "additionalInfo": " - kan bestilles",
+              "availability": "Ikke på lager",
+              "location": "Horten",
+              "readableValue": "Horten: Ikke på lager - kan bestilles"
+            },
+            {
+              "additionalInfo": " - flere kan bestilles",
+              "availability": "1 i butikken",
+              "location": "Holmestrand",
+              "readableValue": "Holmestrand: 1 i butikken - flere kan bestilles"
+            },
+            {
+              "additionalInfo": " - kan bestilles",
+              "availability": "Ikke på lager",
+              "location": "Stokke",
+              "readableValue": "Stokke: Ikke på lager - kan bestilles"
+            }
+          ],
+          "openStockLocator": true
+        }
+      },
+      "product_selection": "Basisutvalget",
+      "releaseMode": false,
+      "status": "aktiv",
+      "sub_District": {
+        "code": "italia_lombardia_franciacorta",
+        "name": "Franciacorta"
+      },
+      "sustainable": true,
+      "url": "/Land/Italia/Lombardia/Franciacorta/1701-Franciacorta-Brut-Nature/p/13045101",
+      "volume": {
+        "formattedValue": "75 cl",
+        "readableValue": "75 centiliter",
+        "value": 75.0
+      }
+    },
+    {
+      "alcohol": {
+        "formattedValue": "40%",
+        "readableValue": "40 prosent",
+        "value": 40.0
+      },
+      "buyable": true,
+      "code": "19576208",
+      "district": {
+        "code": "norge_agder",
+        "name": "Agder"
+      },
+      "expired": false,
+      "main_category": {
+        "code": "brennevin",
+        "name": "Brennevin"
+      },
+      "main_country": {
+        "code": "norge",
+        "name": "Norge"
+      },
+      "main_sub_category": {
+        "code": "brennevin_akevitt",
+        "name": "Akevitt"
+      },
+      "name": "24 Norske Akevitter 2025 (23x2cl,1x4cl)",
+      "price": {
+        "formattedValue": "Kr 799,90",
+        "readableValue": "799 kroner og 90 øre",
+        "value": 799.9
+      },
+      "productAvailability": {
+        "deliveryAvailability": {
+          "availableForPurchase": false,
+          "infos": [
+            {
+              "availability": "Utsolgt",
+              "location": "Post/Levering",
+              "readableValue": "Post/Levering: Utsolgt"
+            }
+          ],
+          "openStockLocator": false
+        },
+        "storesAvailability": {
+          "availableForPurchase": true,
+          "infoAvailabilityAllStores": "Vis butikker med varen på lager",
+          "infos": [
+            {
+              "availability": "Utsolgt",
+              "location": "Horten",
+              "readableValue": "Horten: Utsolgt"
+            },
+            {
+              "availability": "4 i butikken",
+              "location": "Holmestrand",
+              "readableValue": "Holmestrand: 4 i butikken"
+            },
+            {
+              "availability": "Utsolgt",
+              "location": "Stokke",
+              "readableValue": "Stokke: Utsolgt"
+            }
+          ],
+          "openStockLocator": true
+        }
+      },
+      "product_selection": "Bestillingsutvalget",
+      "releaseMode": false,
+      "status": "utsolgt",
+      "sub_District": {
+        "code": "norge_agder_grimstad",
+        "name": "Grimstad"
+      },
+      "sustainable": false,
+      "url": "/Land/Norge/Agder/Grimstad/24-Norske-Akevitter-2025-%2823x2cl%2C1x4cl%29/p/19576208",
+      "volume": {
+        "formattedValue": "50 cl",
+        "readableValue": "50 centiliter",
+        "value": 50.0
+      }
+    }
+  ]
+}

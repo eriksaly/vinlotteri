@@ -19,9 +19,10 @@ import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Nightly check against Vinmonopolet, in two steps:
-// 1. Fetch the listing of everything in stock at Horten (~1,700 products, 24 per page, ~70 requests)
-//    and replace vmp_horten_products with it.
-// 2. Check whether VG-reviewed products that aren't in stock at Horten have been discontinued
+// 1. Fetch the listing of everything in stock at the stores in VmpStores, one listing per batch
+//    (~7,000 products, 24 per page, ~290 requests), and replace those stores' stock in vmp_store_stock
+//    and vmp_products with it.
+// 2. Check whether VG-reviewed products that none of those stores have in stock have been discontinued
 //    ("Utgått"), and note their current price. One request per product, each product once a week
 //    (~700 products).
 // Vinmonopolet starts answering 429 after roughly 1,000 requests in 20 minutes, so requests are spaced
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Component
 class VinmonopoletStockCheckJob(
     private val vinmonopoletService: VinmonopoletService,
-    private val hortenStockService: HortenStockService,
+    private val vmpStockService: VmpStockService,
     private val wineReviewService: WineReviewService,
     private val taskScheduler: TaskScheduler,
     @Value("\${app.background-jobs.enabled}") private val enabled: Boolean
@@ -56,8 +57,8 @@ class VinmonopoletStockCheckJob(
     @EventListener(ApplicationReadyEvent::class)
     @Order(2)
     fun checkIfNeverRun() {
-        if (!enabled || hortenStockService.hasBeenChecked()) return
-        log.info("Horten stock has never been checked, starting initial check")
+        if (!enabled || vmpStockService.hasBeenChecked()) return
+        log.info("Store stock has never been checked, starting initial check")
         taskScheduler.schedule({ checkLogged() }, Instant.now())
     }
 
@@ -112,25 +113,39 @@ class VinmonopoletStockCheckJob(
             }
         }
 
-        updateHortenStock { page -> throttled { vinmonopoletService.getHortenStockPage(page) } }
+        VmpStores.batches.forEach { batch ->
+            val storeIds = batch.map { it.id }
+            updateStoreStock(storeIds) { page -> throttled { vinmonopoletService.getStoreStockPage(storeIds, page) } }
+        }
         checkDiscontinued { productId -> throttled { vinmonopoletService.getProductStatus(productId) } }
         log.info("Vinmonopolet stock check done, refusals={}", refusals)
     }
 
-    // Fetches every page before touching the table, so a failed run leaves the previous listing in place
-    private fun updateHortenStock(fetchPage: (Int) -> VinmonopoletService.HortenStockPage) {
+    // Fetches every page before touching the tables, so a failed listing leaves the stores' previous stock
+    // in place. Each batch is saved on its own: if a later one fails, the earlier ones keep their update.
+    private fun updateStoreStock(storeIds: List<String>, fetchPage: (Int) -> VinmonopoletService.StoreStockPage) {
         val first = fetchPage(0)
+        check(first.storeIds.toSet() == storeIds.toSet()) {
+            "Asked Vinmonopolet for the stock of stores $storeIds but it applied ${first.storeIds}"
+        }
         // Products moving in or out of stock mid-run can shift one onto two pages
         val products = linkedMapOf<String, StoreProduct>()
         first.products.forEach { products.putIfAbsent(it.code, it) }
         for (page in 1 until first.totalPages) {
             fetchPage(page).products.forEach { products.putIfAbsent(it.code, it) }
         }
-        check(first.totalResults > 0 && products.size >= first.totalResults * minListingCoverage) {
-            "Horten listing has ${products.size} products but Vinmonopolet reported ${first.totalResults}, keeping the previous listing"
+        // The search can list a product that has since sold out at all of the stores ("Utsolgt")
+        val inStock = products.values.filter { it.stock.isNotEmpty() }
+        check(first.totalResults > 0 && inStock.size >= first.totalResults * minListingCoverage) {
+            "Listing for stores $storeIds has ${inStock.size} products in stock but Vinmonopolet reported ${first.totalResults}, keeping the previous stock"
         }
-        hortenStockService.replaceAll(products.values.toList(), Instant.now())
-        log.info("Horten stock updated: {} products in stock", products.size)
+        val productsPerStore = storeIds.associateWith { id -> inStock.count { id in it.stock } }
+        // More likely a store whose availability entries weren't recognised than one that has nothing
+        check(productsPerStore.values.all { it > 0 }) {
+            "No stock found for some of the stores: $productsPerStore, keeping the previous stock"
+        }
+        vmpStockService.replaceStores(storeIds, inStock, Instant.now())
+        log.info("Stock updated for stores {}: {} products in stock, per store {}", storeIds, inStock.size, productsPerStore)
     }
 
     private fun checkDiscontinued(fetchStatus: (String) -> VinmonopoletService.ProductStatus?) {

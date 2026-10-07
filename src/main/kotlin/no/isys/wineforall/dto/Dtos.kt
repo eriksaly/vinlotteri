@@ -255,9 +255,11 @@ data class WineProductDto(
     val pricePerScore: Double?,
     // In stock at Vinmonopolet Horten; null until Horten's stock has been checked
     val inStock: Boolean?,
-    // Bottles in stock, when Vinmonopolet reported a count
+    // Bottles in stock at Horten; null when Horten has none
     val hortenStock: Int?,
     val stockCheckedAt: Instant?,
+    // Bottles by Vinmonopolet store id, for the stores in the stock check that have the product
+    val storeStock: Map<String, Int>,
     // Score, grade and vintage of the most recent review
     val score: Int,
     val grade: Int,
@@ -301,10 +303,19 @@ data class WineProductDetailDto(
     val product: WineProductDto,
     val grape: String?,
     val subRegion: String?,
-    // Vinmonopolet lists the product as "Utgått". The product list leaves these out unless Horten has some.
+    // Vinmonopolet lists the product as "Utgått". The product list leaves these out unless one of the
+    // stores in the stock check has some.
     val discontinued: Boolean,
     // Most recent first
     val reviews: List<WineReviewDto>
+)
+
+// A Vinmonopolet store whose stock is checked every night
+data class VmpStoreDto(
+    val id: String,
+    val name: String,
+    // null until the store's stock has been checked
+    val stockCheckedAt: Instant?
 )
 
 data class WineReviewSyncResultDto(

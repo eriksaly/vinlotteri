@@ -27,8 +27,8 @@ class WineReviewSyncJob(
 
     // Initial import: the first start against an empty database pulls in everything VG has published.
     // Runs on the scheduler so it doesn't hold up startup. Ordered before VinmonopoletStockCheckJob's
-    // startup check; that check fetches the Horten listing for a few minutes before it reads the VG
-    // products, and this import takes seconds.
+    // startup check; that check fetches the store listings for a quarter of an hour before it reads the
+    // VG products, and this import takes seconds.
     @EventListener(ApplicationReadyEvent::class)
     @Order(1)
     fun syncIfEmpty() {

@@ -2,15 +2,15 @@ package no.isys.wineforall.model
 
 import jakarta.persistence.*
 import org.hibernate.annotations.DynamicUpdate
-import java.time.Instant
 
-// Vinmonopolet products in stock at Horten Sjøsiden, from the store listing fetched by
-// VinmonopoletStockCheckJob. Each check replaces the table, so a product that sells out disappears.
+// Vinmonopolet products in stock at one or more of the stores VinmonopoletStockCheckJob lists, from
+// those stores' listings. Each store's stock of them is in vmp_store_stock; a product that sells out at
+// all of the stores is deleted.
 // @DynamicUpdate: the nightly refresh only writes the columns that changed.
 @Entity
 @DynamicUpdate
-@Table(name = "vmp_horten_products")
-class VmpHortenProduct(
+@Table(name = "vmp_products")
+class VmpProduct(
     // Vinmonopolet varenummer
     @Id
     val productId: String,
@@ -32,11 +32,5 @@ class VmpHortenProduct(
     var productSelection: String? = null,
     var url: String? = null,
     // From the end of the product name; null for non-vintage products
-    var vintage: Int? = null,
-
-    // Bottles in the store; null if Vinmonopolet's availability text couldn't be read
-    var hortenStock: Int? = null,
-
-    @Column(nullable = false)
-    var stockCheckedAt: Instant
+    var vintage: Int? = null
 )

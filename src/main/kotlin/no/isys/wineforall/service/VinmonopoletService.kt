@@ -371,36 +371,46 @@ class VinmonopoletService(restClientBuilder: RestClient.Builder) {
         return ProductStatus(status = parsed.status, price = parsed.price?.value, vintage = parsed.year?.toIntOrNull())
     }
 
-    // One page of the products in stock at Horten. Vinmonopolet returns at most 24 products per page,
-    // whatever pageSize asks for. Sorted by name rather than relevance so the order holds still while paging.
-    fun getHortenStockPage(page: Int): HortenStockPage {
-        val q = URLEncoder.encode(":name-asc:availableInStores:$storeId", StandardCharsets.UTF_8).replace("+", "%20")
-        val url = "$baseUrl/products/search?fields=FULL&pageSize=24&currentPage=$page&q=$q&latitude=$storeLat&longitude=$storeLon"
+    // One page of the products in stock at any of `storeIds`, with each store's stock of them. Vinmonopolet
+    // applies at most three store filters and silently drops the rest; the page's storeIds are the ones it
+    // applied. It returns at most 24 products per page, whatever pageSize asks for. Sorted by name rather
+    // than relevance so the order holds still while paging.
+    fun getStoreStockPage(storeIds: List<String>, page: Int): StoreStockPage {
+        val filters = storeIds.joinToString("") { ":availableInStores:$it" }
+        val q = URLEncoder.encode(":name-asc$filters", StandardCharsets.UTF_8).replace("+", "%20")
+        val url = "$baseUrl/products/search?fields=FULL&pageSize=24&currentPage=$page&q=$q"
         val raw = client.get()
             .uri(URI.create(url))
             .header("Accept", "application/json")
             .retrieve()
-            .body(String::class.java) ?: throw IllegalStateException("Empty response for Horten stock page $page")
-        return parseHortenStockPage(raw)
+            .body(String::class.java) ?: throw IllegalStateException("Empty response for store stock page $page")
+        return parseStoreStockPage(raw)
     }
 
-    internal fun parseHortenStockPage(json: String): HortenStockPage {
+    internal fun parseStoreStockPage(json: String): StoreStockPage {
         val parsed = parse(json, SearchResponse::class.java)
-        return HortenStockPage(
-            products = parsed.products.orEmpty().mapNotNull { it.toStoreProduct() },
+        // storesAvailability names the stores ("Horten"); the breadcrumbs of the applied filters give their ids
+        val storeIdsByName = parsed.breadcrumbs.orEmpty()
+            .filter { it.facetCode == "availableInStores" }
+            .mapNotNull { b -> b.facetValueName?.let { name -> b.facetValueCode?.let { id -> name to id } } }
+            .toMap()
+        return StoreStockPage(
+            storeIds = storeIdsByName.values.toList(),
+            products = parsed.products.orEmpty().mapNotNull { it.toStoreProduct(storeIdsByName) },
             totalPages = parsed.pagination?.totalPages ?: 0,
             totalResults = parsed.pagination?.totalResults ?: 0
         )
     }
 
-    // With coordinates, storesAvailability describes the nearest store, i.e. Horten: "13 i butikken"
+    // storesAvailability has an entry for each store in the filter: "13 i butikken" when the store has the
+    // product, otherwise "Ikke på lager", "Utsolgt", "Utgått" and the like
     private val storeStockPattern = Regex("""^(\d+) i butikken""")
 
     // The search results have no year field, but Vinmonopolet ends the names of vintage wines with the
     // vintage ("Cune Crianza 2021"). Non-vintage products have no year.
     private val vintageInName = Regex("""\b((?:19|20)\d{2})$""")
 
-    private fun ProductRaw.toStoreProduct(): StoreProduct? {
+    private fun ProductRaw.toStoreProduct(storeIdsByName: Map<String, String>): StoreProduct? {
         return StoreProduct(
             code = code ?: return null,
             name = name ?: return null,
@@ -416,12 +426,23 @@ class VinmonopoletService(restClientBuilder: RestClient.Builder) {
             productSelection = productSelection,
             url = url?.let { "https://www.vinmonopolet.no$it" },
             vintage = vintageInName.find(name.trim())?.groupValues?.get(1)?.toInt(),
-            stockLevel = productAvailability?.storesAvailability?.infos.orEmpty()
-                .firstNotNullOfOrNull { storeStockPattern.find(it.availability ?: "")?.groupValues?.get(1)?.toInt() }
+            stock = productAvailability?.storesAvailability?.infos.orEmpty()
+                .mapNotNull { info ->
+                    val storeId = storeIdsByName[info.location] ?: return@mapNotNull null
+                    val bottles = storeStockPattern.find(info.availability ?: "")?.groupValues?.get(1)?.toInt()
+                    if (bottles != null && bottles > 0) storeId to bottles else null
+                }
+                .toMap()
         )
     }
 
-    data class HortenStockPage(val products: List<StoreProduct>, val totalPages: Int, val totalResults: Int)
+    data class StoreStockPage(
+        // The store filters Vinmonopolet applied
+        val storeIds: List<String>,
+        val products: List<StoreProduct>,
+        val totalPages: Int,
+        val totalResults: Int
+    )
     data class StoreProduct(
         val code: String,
         val name: String,
@@ -436,8 +457,8 @@ class VinmonopoletService(restClientBuilder: RestClient.Builder) {
         val productSelection: String?,
         val url: String?,
         val vintage: Int?,
-        // Bottles in the store; null if the availability text couldn't be read
-        val stockLevel: Int?
+        // Bottles by store id, for the stores in the listing that have the product
+        val stock: Map<String, Int>
     )
 
     // A body that isn't the JSON we expect fails like any other bad response from Vinmonopolet
@@ -451,8 +472,14 @@ class VinmonopoletService(restClientBuilder: RestClient.Builder) {
     // year is a string ("2021"), and missing for non-vintage products
     data class ProductStatusRaw(val status: String? = null, val price: PriceRaw? = null, val year: String? = null)
 
-    data class SearchResponse(val products: List<ProductRaw>? = null, val pagination: PaginationRaw? = null)
+    data class SearchResponse(
+        val products: List<ProductRaw>? = null,
+        val pagination: PaginationRaw? = null,
+        val breadcrumbs: List<BreadcrumbRaw>? = null
+    )
     data class PaginationRaw(val totalPages: Int? = null, val totalResults: Int? = null)
+    // An applied filter, e.g. facetCode "availableInStores", facetValueCode "237", facetValueName "Horten"
+    data class BreadcrumbRaw(val facetCode: String? = null, val facetValueCode: String? = null, val facetValueName: String? = null)
     data class ProductRaw(
         val code: String? = null,
         val name: String? = null,
@@ -472,7 +499,8 @@ class VinmonopoletService(restClientBuilder: RestClient.Builder) {
     data class MeasureRaw(val value: Double? = null)
     data class ProductAvailabilityRaw(val storesAvailability: StoresAvailabilityRaw? = null)
     data class StoresAvailabilityRaw(val infos: List<AvailabilityInfoRaw>? = null)
-    data class AvailabilityInfoRaw(val availability: String? = null)
+    // location is the store's name, e.g. "Horten"
+    data class AvailabilityInfoRaw(val location: String? = null, val availability: String? = null)
     // stock reflects the nearest store (determined by lat/lon); stockLevelStatus "outOfStock" = not in Horten
     data class StockRaw(val stockLevel: Int? = null, val stockLevelStatus: String? = null)
 }

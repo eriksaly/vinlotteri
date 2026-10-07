@@ -1,31 +1,33 @@
 import { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef, memo, Fragment } from 'react'
 import { useNavigationType, useSearchParams } from 'react-router-dom'
 import api from '../api/client'
-import type { WineProduct, WineReview, WineReviewSyncResult } from '../types'
+import type { VmpStore, WineProduct, WineReview, WineReviewSyncResult } from '../types'
 import { useAuth } from '../App'
 import NavBar from '../components/NavBar'
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect'
 import { Terningkast } from '../components/Terningkast'
-import { formatVolume, HortenStock, twoDecimals } from '../components/WineProductInfo'
+import { dateTime, formatVolume, twoDecimals } from '../components/WineProductInfo'
 import { PHONE_QUERY, useMediaQuery } from '../useMediaQuery'
 
 type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
 type SortDir = 'asc' | 'desc'
 
-const SORT_VALUE: Record<SortKey, (p: WineProduct) => string | number | null> = {
+// `stores` are the stores the stock column shows
+const SORT_VALUE: Record<SortKey, (p: WineProduct, stores: VmpStore[]) => string | number | null> = {
   name: p => p.productShortName,
   country: p => p.country,
   region: p => p.regionDetailed,
   volume: p => p.volume,
   price: p => p.price,
   pricePerScore: p => p.pricePerScore,
-  stock: p => p.inStock == null ? null : p.inStock ? p.hortenStock ?? 1 : 0,
+  stock: (p, stores) => stockAt(p, stores),
   score: p => p.score,
 }
 
-// Column headers, and the sort dropdown that replaces them on phones
+// Column headers, and the sort dropdown that replaces them on phones. The stock column is named after
+// its store when it shows only one (stockLabel).
 const SORT_LABEL: Record<SortKey, string> = {
-  name: 'Navn', country: 'Land', region: 'Region', volume: 'Volum', price: 'Pris', pricePerScore: 'Pris/poeng', stock: 'Horten', score: 'Vurdering',
+  name: 'Navn', country: 'Land', region: 'Region', volume: 'Volum', price: 'Pris', pricePerScore: 'Pris/poeng', stock: 'Lager', score: 'Vurdering',
 }
 const PRICE_PER_SCORE_HINT = 'Literpris delt på poeng. Lavere er bedre kjøp.'
 
@@ -33,6 +35,17 @@ const PRICE_PER_SCORE_HINT = 'Literpris delt på poeng. Lavere er bedre kjøp.'
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: 'asc', country: 'asc', region: 'asc', volume: 'asc', price: 'asc', pricePerScore: 'asc', stock: 'desc', score: 'desc',
 }
+
+// Horten is chosen until the user picks other stores
+const DEFAULT_STORES = ['237']
+
+// Bottles at the given stores together; null until one of them has been checked
+function stockAt(p: WineProduct, stores: VmpStore[]): number | null {
+  if (!stores.some(s => s.stockCheckedAt != null)) return null
+  return stores.reduce((sum, s) => sum + (p.storeStock[s.id] ?? 0), 0)
+}
+
+const stockLabel = (stores: VmpStore[]) => stores.length === 1 ? stores[0].name : SORT_LABEL.stock
 
 // hasOwnProperty rather than `in`, which also accepts inherited keys like "constructor"
 const isSortKey = (key: string | null): key is SortKey =>
@@ -44,7 +57,8 @@ interface Filters {
   maxPrice: string
   // Lowest score (points) of the most recent review
   minScore: string
-  inStockOnly: boolean
+  // Vinmonopolet store ids; shows the products in stock at any of them. Empty shows every product.
+  stores: string[]
   countries: string[]
   regions: string[]
   // Litres as strings, e.g. "0.75"
@@ -57,12 +71,15 @@ interface Filters {
 function filtersFromQuery(params: URLSearchParams): Filters {
   const key = params.get('sort')
   const dir = params.get('dir')
+  const stores = params.getAll('store').filter(Boolean)
   return {
     types: params.getAll('type').filter(Boolean),
     q: params.get('q') ?? '',
     maxPrice: params.get('maxPrice') ?? '',
     minScore: params.get('minScore') ?? '',
-    inStockOnly: params.get('inStock') !== '0',
+    // No store parameter means the default stores. inStock=0 means none, as it did for the "in stock at
+    // Horten" checkbox this replaced, so old links still work.
+    stores: params.get('inStock') === '0' ? [] : stores.length > 0 ? stores : DEFAULT_STORES,
     countries: params.getAll('country').filter(Boolean),
     regions: params.getAll('region').filter(Boolean),
     volumes: params.getAll('volume').filter(Boolean),
@@ -81,7 +98,8 @@ function filtersToQuery(f: Filters): string {
   if (f.q) params.set('q', f.q)
   if (f.maxPrice) params.set('maxPrice', f.maxPrice)
   if (f.minScore) params.set('minScore', f.minScore)
-  if (!f.inStockOnly) params.set('inStock', '0')
+  if (f.stores.length === 0) params.set('inStock', '0')
+  else if (f.stores.join() !== DEFAULT_STORES.join()) f.stores.forEach(v => params.append('store', v))
   f.countries.forEach(v => params.append('country', v))
   f.regions.forEach(v => params.append('region', v))
   f.volumes.forEach(v => params.append('volume', v))
@@ -112,7 +130,7 @@ export default function WineReviews() {
         <div className="container">
           <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>⭐</div>
           <h1 className="page-title">VG-anmeldelser</h1>
-          <p className="page-subtitle">Terningkast fra VG, med lagerstatus fra Vinmonopolet i Horten.</p>
+          <p className="page-subtitle">Terningkast fra VG, med lagerstatus fra Vinmonopolet.</p>
         </div>
       </div>
 
@@ -135,9 +153,10 @@ function WineReviewList() {
   const query = params.toString()
   const navigationType = useNavigationType()
   const [filters, setFilters] = useState(() => filtersFromQuery(params))
-  const { types, q: search, maxPrice, minScore, inStockOnly, countries, regions, volumes, text, sort } = filters
+  const { types, q: search, maxPrice, minScore, stores, countries, regions, volumes, text, sort } = filters
   const updateFilters = (changes: Partial<Filters>) => setFilters(f => ({ ...f, ...changes }))
   const [products, setProducts] = useState<WineProduct[]>([])
+  const [vmpStores, setVmpStores] = useState<VmpStore[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [reviews, setReviews] = useState<Record<string, WineReview[]>>({})
@@ -153,8 +172,12 @@ function WineReviewList() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api.get<WineProduct[]>('/api/wine-reviews/products')
-      setProducts(r.data)
+      const [productsRes, storesRes] = await Promise.all([
+        api.get<WineProduct[]>('/api/wine-reviews/products'),
+        api.get<VmpStore[]>('/api/wine-reviews/stores'),
+      ])
+      setProducts(productsRes.data)
+      setVmpStores(storesRes.data.sort((a, b) => a.name.localeCompare(b.name, 'nb')))
       setLoadFailed(false)
     } catch {
       setLoadFailed(true)
@@ -184,6 +207,10 @@ function WineReviewList() {
   const byLabel = (a: MultiSelectOption, b: MultiSelectOption) => a.label.localeCompare(b.label, 'nb')
   const typeOptions = useMemo(() => countBy(products, p => p.subProductTypeName).sort((a, b) => b.count! - a.count!), [products])
   const countryOptions = useMemo(() => countBy(products, p => p.country).sort(byLabel), [products])
+  const storeOptions = useMemo(
+    () => vmpStores.map(s => ({ value: s.id, label: s.name, count: products.filter(p => p.storeStock[s.id] != null).length })),
+    [vmpStores, products],
+  )
   // Region names repeat across countries ("Øvrige"), so only list the chosen countries' regions
   const inCountries = (p: WineProduct) => countries.length === 0 || (p.country != null && countries.includes(p.country))
   const regionOptions = useMemo(
@@ -227,8 +254,13 @@ function WineReviewList() {
   // the input updates first and React renders the list in the background
   const deferred = useDeferredValue(filters)
   const deferredTextActive = deferred.text.trim().length >= 2
+  // The stores the stock column shows: the chosen ones, or all of them when none are chosen
+  const shownStores = useMemo(
+    () => deferred.stores.length === 0 ? vmpStores : vmpStores.filter(s => deferred.stores.includes(s.id)),
+    [vmpStores, deferred.stores],
+  )
   const visible = useMemo(() => {
-    const { types, q: search, maxPrice, minScore, inStockOnly, countries, regions, volumes, sort } = deferred
+    const { types, q: search, maxPrice, minScore, stores, countries, regions, volumes, sort } = deferred
     const inCountries = (p: WineProduct) => countries.length === 0 || (p.country != null && countries.includes(p.country))
     const q = search.trim().toLowerCase()
     const max = maxPrice === '' ? null : Number(maxPrice)
@@ -240,15 +272,15 @@ function WineReviewList() {
       .filter(p => !q || (p.productShortName ?? '').toLowerCase().includes(q) || p.productId.includes(q))
       .filter(p => max == null || (p.price != null && p.price <= max))
       .filter(p => min == null || p.score >= min)
-      .filter(p => !inStockOnly || p.inStock === true)
+      .filter(p => stores.length === 0 || stores.some(id => p.storeStock[id] != null))
       .filter(inCountries)
       .filter(p => regions.length === 0 || (p.regionDetailed != null && regions.includes(p.regionDetailed)))
       .filter(p => volumes.length === 0 || (p.volume != null && volumes.includes(String(p.volume))))
       // Until the first reply arrives the text filter isn't applied; after that the latest reply is used
       .filter(p => !deferredTextActive || !textMatches || textMatches.ids.has(p.productId))
       .sort((a, b) => {
-        const va = getValue(a)
-        const vb = getValue(b)
+        const va = getValue(a, shownStores)
+        const vb = getValue(b, shownStores)
         // Missing values go last regardless of direction
         if (va == null || vb == null) {
           if (va != null) return -1
@@ -258,7 +290,7 @@ function WineReviewList() {
         }
         return b.score - a.score || b.grade - a.grade || (a.productShortName ?? '').localeCompare(b.productShortName ?? '', 'nb')
       })
-  }, [products, deferred, deferredTextActive, textMatches])
+  }, [products, deferred, deferredTextActive, textMatches, shownStores])
 
   const toggleSort = (key: SortKey) => {
     updateFilters({ sort: sort.key === key ? { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: DEFAULT_DIR[key] } })
@@ -309,13 +341,14 @@ function WineReviewList() {
   if (loading) return <div className="card"><div className="card-body">Henter vinanmeldelser...</div></div>
 
   const reviewTotal = products.reduce((sum, p) => sum + p.reviewCount, 0)
+  const labels = { ...SORT_LABEL, stock: stockLabel(shownStores) }
   const sortHeader = (k: SortKey, align?: 'right', title?: string) => (
     <th
       title={title}
       onClick={() => toggleSort(k)}
       style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: align, color: sort.key === k ? 'var(--wine)' : undefined }}
     >
-      {SORT_LABEL[k]} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+      {labels[k]} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
     </th>
   )
 
@@ -390,9 +423,15 @@ function WineReviewList() {
                 onChange={e => updateFilters({ minScore: e.target.value })}
               />
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={inStockOnly} onChange={e => updateFilters({ inStockOnly: e.target.checked })} />
-              Kun på lager i Horten
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              På lager i
+              <MultiSelect
+                placeholder="Ikke filtrert"
+                options={storeOptions}
+                selected={stores}
+                onChange={next => updateFilters({ stores: next })}
+                minWidth={150}
+              />
             </label>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -420,7 +459,7 @@ function WineReviewList() {
             {textSearching && (
               <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Søker...</span>
             )}
-            {(types.length > 0 || search || maxPrice || minScore || inStockOnly || countries.length > 0 || regions.length > 0
+            {(types.length > 0 || search || maxPrice || minScore || stores.length > 0 || countries.length > 0 || regions.length > 0
               || volumes.length > 0 || textQuery.length >= 2) && (
               <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{visible.length} treff</span>
             )}
@@ -454,7 +493,7 @@ function WineReviewList() {
                 value={sort.key}
                 onChange={e => { const key = e.target.value as SortKey; updateFilters({ sort: { key, dir: DEFAULT_DIR[key] } }) }}
               >
-                {(Object.keys(SORT_LABEL) as SortKey[]).map(k => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+                {(Object.keys(labels) as SortKey[]).map(k => <option key={k} value={k}>{labels[k]}</option>)}
               </select>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => toggleSort(sort.key)} title="Snu rekkefølgen">
                 {sort.dir === 'asc' ? '▲ Stigende' : '▼ Synkende'}
@@ -464,6 +503,7 @@ function WineReviewList() {
               <PhoneProductRow
                 key={p.productId}
                 p={p}
+                stores={shownStores}
                 expanded={expandedId === p.productId}
                 reviews={reviews[p.productId]}
                 onToggle={onToggleExpand}
@@ -491,6 +531,7 @@ function WineReviewList() {
                   <ProductRow
                     key={p.productId}
                     p={p}
+                    stores={shownStores}
                     expanded={expandedId === p.productId}
                     reviews={reviews[p.productId]}
                     onToggle={onToggleExpand}
@@ -506,8 +547,9 @@ function WineReviewList() {
 }
 
 // Memoized so a filter change only re-renders the rows whose data changed
-const ProductRow = memo(function ProductRow({ p, expanded, reviews, onToggle }: {
+const ProductRow = memo(function ProductRow({ p, stores, expanded, reviews, onToggle }: {
   p: WineProduct
+  stores: VmpStore[]
   expanded: boolean
   reviews: WineReview[] | undefined
   onToggle: (productId: string) => void
@@ -540,7 +582,7 @@ const ProductRow = memo(function ProductRow({ p, expanded, reviews, onToggle }: 
           {p.pricePerScore != null ? twoDecimals.format(p.pricePerScore) : '—'}
         </td>
         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <HortenStock p={p} />
+          <StoreStock p={p} stores={stores} stacked />
         </td>
         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
           <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{p.score}</span>
@@ -569,8 +611,9 @@ const ProductRow = memo(function ProductRow({ p, expanded, reviews, onToggle }: 
 })
 
 // ProductRow for phones: the same information stacked under the name instead of in columns
-const PhoneProductRow = memo(function PhoneProductRow({ p, expanded, reviews, onToggle }: {
+const PhoneProductRow = memo(function PhoneProductRow({ p, stores, expanded, reviews, onToggle }: {
   p: WineProduct
+  stores: VmpStore[]
   expanded: boolean
   reviews: WineReview[] | undefined
   onToggle: (productId: string) => void
@@ -600,7 +643,7 @@ const PhoneProductRow = memo(function PhoneProductRow({ p, expanded, reviews, on
             {p.pricePerScore != null && (
               <span style={{ ...muted, whiteSpace: 'nowrap' }} title={PRICE_PER_SCORE_HINT}>Pris/poeng {twoDecimals.format(p.pricePerScore)}</span>
             )}
-            {p.inStock != null && <span style={{ ...muted, whiteSpace: 'nowrap' }}>Horten <HortenStock p={p} /></span>}
+            {stockAt(p, stores) != null && <span style={muted}>{stockLabel(stores)} <StoreStock p={p} stores={stores} stacked={false} /></span>}
           </div>
         </div>
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -618,6 +661,32 @@ const PhoneProductRow = memo(function PhoneProductRow({ p, expanded, reviews, on
     </div>
   )
 })
+
+// Bottles at the stores the stock column shows, with when they were checked on hover. One store shows its
+// count; several list each store that has the product, one per line in the table (stacked) and side by
+// side on phones.
+function StoreStock({ p, stores, stacked }: { p: WineProduct; stores: VmpStore[]; stacked: boolean }) {
+  const total = stockAt(p, stores)
+  const checks = stores.flatMap(s => s.stockCheckedAt != null ? [Date.parse(s.stockCheckedAt)] : [])
+  // The stores are checked in batches some minutes apart, so this gives the oldest check
+  const title = checks.length > 0 ? `Sjekket ${dateTime.format(new Date(Math.min(...checks)))}` : 'Ikke sjekket ennå'
+  if (total == null) return <span title={title} style={{ color: 'var(--text-muted)' }}>—</span>
+  if (total === 0) return <span title={title} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Ikke på lager</span>
+  if (stores.length === 1) return <span title={title} className="badge badge-green">{total} stk</span>
+  return (
+    <span title={title} style={{
+      display: 'inline-flex', flexWrap: 'wrap',
+      ...(stacked ? { flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' } : { columnGap: '0.6rem' }),
+    }}>
+      {stores.filter(s => p.storeStock[s.id] != null).map(s => (
+        <span key={s.id} style={{ whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.name}</span>{' '}
+          <span className="badge badge-green">{p.storeStock[s.id]} stk</span>
+        </span>
+      ))}
+    </span>
+  )
+}
 
 // " · 2024 (2021)" when Vinmonopolet sells a newer vintage than the one reviewed, otherwise " · 2021"
 function Vintages({ current, reviewed }: { current: number | null; reviewed: number | null }) {

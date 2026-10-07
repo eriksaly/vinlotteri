@@ -179,9 +179,11 @@ export interface WineProduct {
   pricePerScore: number | null
   // null until Horten's stock has been checked
   inStock: boolean | null
-  // Bottles in stock, when Vinmonopolet reported a count
+  // Bottles in stock at Horten; null when Horten has none
   hortenStock: number | null
   stockCheckedAt: string | null
+  // Bottles by Vinmonopolet store id, for the stores in the stock check that have the product
+  storeStock: Record<string, number>
   score: number
   grade: number
   // Vintage of the most recent review
@@ -192,6 +194,14 @@ export interface WineProduct {
   lastReviewedAt: string
   imageUrl: string
   vinmonopoletUrl: string
+}
+
+// A Vinmonopolet store whose stock is checked every night
+export interface VmpStore {
+  id: string
+  name: string
+  // null until the store's stock has been checked
+  stockCheckedAt: string | null
 }
 
 export interface WineReview {

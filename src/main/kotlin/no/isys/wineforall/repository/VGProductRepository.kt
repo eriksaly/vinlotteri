@@ -10,13 +10,13 @@ import java.time.Instant
 interface VGProductRepository : JpaRepository<VGProduct, String> {
 
     // Products whose discontinued status was never checked or last checked before checkedBefore, skipping
-    // those in stock at Horten: Vinmonopolet doesn't stock discontinued products. Least recently checked
-    // first, so a run that gets cut short resumes where it left off.
+    // those in stock at one of the listed stores (vmp_products): Vinmonopolet doesn't stock discontinued
+    // products. Least recently checked first, so a run that gets cut short resumes where it left off.
     @Query(
         """
         SELECT p.productId FROM VGProduct p
         WHERE (p.statusCheckedAt IS NULL OR p.statusCheckedAt < :checkedBefore)
-          AND NOT EXISTS (SELECT 1 FROM VmpHortenProduct h WHERE h.productId = p.productId)
+          AND NOT EXISTS (SELECT 1 FROM VmpProduct v WHERE v.productId = p.productId)
         ORDER BY p.statusCheckedAt ASC NULLS FIRST
         """
     )

@@ -7,7 +7,8 @@ import no.isys.wineforall.dto.WineReviewDto
 import no.isys.wineforall.dto.WineReviewSyncResultDto
 import no.isys.wineforall.model.VGProduct
 import no.isys.wineforall.model.VGReview
-import no.isys.wineforall.model.VmpHortenProduct
+import no.isys.wineforall.model.VmpProduct
+import no.isys.wineforall.model.VmpStoreStock
 import no.isys.wineforall.repository.VGProductRepository
 import no.isys.wineforall.repository.VGProductSummary
 import no.isys.wineforall.repository.VGReviewRepository
@@ -21,7 +22,7 @@ import kotlin.math.abs
 class WineReviewService(
     private val productRepo: VGProductRepository,
     private val reviewRepo: VGReviewRepository,
-    private val hortenStockService: HortenStockService,
+    private val vmpStockService: VmpStockService,
     private val entityManager: EntityManager
 ) {
 
@@ -47,18 +48,19 @@ class WineReviewService(
         product.statusCheckedAt = Instant.now()
     }
 
-    // VG's reviewed products combined with Horten's stock (vmp_horten_products). Products Vinmonopolet
-    // lists as discontinued ("Utgått") are left out, unless Horten still has some.
+    // VG's reviewed products combined with the store listings (vmp_products) and each store's stock
+    // (vmp_store_stock). Products Vinmonopolet lists as discontinued ("Utgått") are left out, unless one
+    // of the listed stores still has some.
     @Transactional(readOnly = true)
     fun getProducts(): List<WineProductDto> {
-        val hortenStock = hortenStockService.getAll().associateBy { it.productId }
-        // Products missing from the Horten table were out of stock at its last check
-        val lastStockCheck = hortenStock.values.maxOfOrNull { it.stockCheckedAt }
+        val vmpProducts = vmpStockService.getVGProducts().associateBy { it.productId }
+        val stock = vmpStockService.getVGProductStock().groupBy { it.productId }
+        val lastHortenCheck = vmpStockService.getLastStockCheck(VmpStores.HORTEN.id)
         return reviewRepo.findProductSummaries().mapNotNull { p ->
-            val stock = hortenStock[p.productId]
-            if (p.discontinued && stock == null) return@mapNotNull null
+            val vmpProduct = vmpProducts[p.productId]
+            if (p.discontinued && vmpProduct == null) return@mapNotNull null
             // The list shows 40 px thumbnails, so the 300x300 image (~4 KB) rather than 1200x1200 (~30 KB)
-            p.toDto(stock, lastStockCheck, imageSize = 300)
+            p.toDto(vmpProduct, stock[p.productId].orEmpty(), lastHortenCheck, imageSize = 300)
         }
     }
 
@@ -67,9 +69,13 @@ class WineReviewService(
     fun getProduct(productId: String): WineProductDetailDto? {
         val summary = reviewRepo.findProductSummary(productId) ?: return null
         val product = productRepo.findById(productId).orElseThrow()
-        val stock = hortenStockService.get(productId)
         return WineProductDetailDto(
-            product = summary.toDto(stock, hortenStockService.getLastStockCheck(), imageSize = 1200),
+            product = summary.toDto(
+                vmpStockService.getProduct(productId),
+                vmpStockService.getProductStock(productId),
+                vmpStockService.getLastStockCheck(VmpStores.HORTEN.id),
+                imageSize = 1200
+            ),
             grape = product.grape,
             subRegion = product.subRegion,
             discontinued = product.discontinued,
@@ -77,11 +83,18 @@ class WineReviewService(
         )
     }
 
-    // Products missing from the Horten table were out of stock at its last check (lastStockCheck)
-    private fun VGProductSummary.toDto(stock: VmpHortenProduct?, lastStockCheck: Instant?, imageSize: Int): WineProductDto {
-        // Most recent price first: Horten's listing from last night, then the weekly discontinued
+    // vmpProduct is null when none of the listed stores have the product, and `stock` has a row for each
+    // store that does. Products Horten doesn't have were out of stock at its last check (lastHortenCheck).
+    private fun VGProductSummary.toDto(
+        vmpProduct: VmpProduct?,
+        stock: List<VmpStoreStock>,
+        lastHortenCheck: Instant?,
+        imageSize: Int
+    ): WineProductDto {
+        val hortenStock = stock.find { it.storeId == VmpStores.HORTEN.id }
+        // Most recent price first: the store listings from last night, then the weekly discontinued
         // check, then VG's price from the time of the review
-        val currentPrice = stock?.price ?: vmpPrice ?: price
+        val currentPrice = vmpProduct?.price ?: vmpPrice ?: price
         return WineProductDto(
             productId = productId,
             productShortName = productShortName,
@@ -93,15 +106,16 @@ class WineReviewService(
             price = currentPrice,
             // VG's price_per_score formula, but from the current price rather than the one at review time
             pricePerScore = if (currentPrice != null && volume != null && volume > 0) currentPrice / volume / score else null,
-            inStock = if (lastStockCheck == null) null else stock != null,
-            hortenStock = stock?.hortenStock,
-            stockCheckedAt = stock?.stockCheckedAt ?: lastStockCheck,
+            inStock = if (lastHortenCheck == null) null else hortenStock != null,
+            hortenStock = hortenStock?.stock,
+            stockCheckedAt = hortenStock?.checkedAt ?: lastHortenCheck,
+            storeStock = stock.associate { it.storeId to it.stock },
             score = score,
             grade = grade,
             vintage = vintage,
-            // Horten's listing when Horten has the product (null there means non-vintage), otherwise the
-            // weekly discontinued check
-            vmpVintage = if (stock != null) stock.vintage else vmpVintage,
+            // The store listings when a listed store has the product (null there means non-vintage),
+            // otherwise the weekly discontinued check
+            vmpVintage = if (vmpProduct != null) vmpProduct.vintage else vmpVintage,
             reviewCount = reviewCount.toInt(),
             lastReviewedAt = reviewedAt,
             imageUrl = "https://bilder.vinmonopolet.no/cache/${imageSize}x$imageSize-0/$productId-1.jpg",
