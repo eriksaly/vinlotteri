@@ -11,11 +11,17 @@ object VmpStores {
 
     // Vinmonopolet Horten Sjøsiden, the store the VG reviews show stock for
     val HORTEN = Store("237", "Horten")
+    private val TONSBERG = Store("295", "Tønsberg")
+    private val STOKKE = Store("398", "Stokke")
+    private val SANDEFJORD = Store("283", "Sandefjord")
+    private val HOLMESTRAND = Store("233", "Holmestrand")
+    private val LEKNES = Store("214", "Leknes")
 
     val batches = listOf(
-        listOf(HORTEN, Store("233", "Holmestrand"), Store("398", "Stokke")),
-        listOf(Store("295", "Tønsberg"), Store("283", "Sandefjord"), Store("214", "Leknes"))
+        listOf(HORTEN, HOLMESTRAND, STOKKE),
+        listOf(TONSBERG, SANDEFJORD, LEKNES)
     )
 
-    val all = batches.flatten()
+    // In order of priority, the order the VG reviews list the stores in
+    val all = listOf(HORTEN, TONSBERG, STOKKE, SANDEFJORD, HOLMESTRAND, LEKNES)
 }

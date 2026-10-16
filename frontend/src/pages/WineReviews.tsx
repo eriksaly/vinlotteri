@@ -181,7 +181,8 @@ function WineReviewList() {
         api.get<VmpStore[]>('/api/wine-reviews/stores'),
       ])
       setProducts(productsRes.data)
-      setVmpStores(storesRes.data.sort((a, b) => a.name.localeCompare(b.name, 'nb')))
+      // In the server's order of priority, which the dropdown and the stock column keep
+      setVmpStores(storesRes.data)
       setLoadFailed(false)
     } catch {
       setLoadFailed(true)
