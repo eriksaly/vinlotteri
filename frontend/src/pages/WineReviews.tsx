@@ -679,10 +679,27 @@ const PhoneProductRow = memo(function PhoneProductRow({ p, stores, expanded, rev
   )
 })
 
+// Stores listed before the rest are folded into "og N til"
+const SHOWN_STORES = 2
+
+// Mice hover over "og N til" to see the rest; touch screens, which can't hover, tap it instead
+const CAN_HOVER = window.matchMedia('(hover: hover)').matches
+
 // Bottles at the stores the stock column shows, with when they were checked on hover. One store shows its
 // count; several list each store that has the product, one per line in the table (stacked) and side by
-// side on phones.
+// side on phones. Past SHOWN_STORES the rest are listed in a popup on hover, or in place when tapped.
 function StoreStock({ p, stores, stacked }: { p: WineProduct; stores: VmpStore[]; stacked: boolean }) {
+  const [showAll, setShowAll] = useState(false)
+  // Where the popup goes. Fixed rather than absolute, as the table's scroll container would clip it.
+  const [popup, setPopup] = useState<React.CSSProperties | null>(null)
+  useEffect(() => {
+    if (!popup) return
+    // A fixed popup would stay put while the page scrolls under it
+    const close = () => setPopup(null)
+    window.addEventListener('scroll', close, true)
+    return () => window.removeEventListener('scroll', close, true)
+  }, [popup])
+
   const total = stockAt(p, stores)
   const checks = stores.flatMap(s => s.stockCheckedAt != null ? [Date.parse(s.stockCheckedAt)] : [])
   // The stores are checked in batches some minutes apart, so this gives the oldest check
@@ -690,15 +707,55 @@ function StoreStock({ p, stores, stacked }: { p: WineProduct; stores: VmpStore[]
   if (total == null) return <span title={title} style={{ color: 'var(--text-muted)' }}>—</span>
   if (total === 0) return <span title={title} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Ikke på lager</span>
   if (stores.length === 1) return <span title={title} className="badge badge-green">{total} stk</span>
+  const inStock = stores.filter(s => p.storeStock[s.id] != null)
+  const hidden = inStock.slice(SHOWN_STORES)
+  const storeLine = (s: VmpStore) => (
+    <span key={s.id} style={{ whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.name}</span>{' '}
+      <span className="badge badge-green">{p.storeStock[s.id]} stk</span>
+    </span>
+  )
+  // Below "og N til" and right-aligned with it, or above it near the bottom of the window
+  const openPopup = (e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const right = document.documentElement.clientWidth - r.right
+    const height = hidden.length * 26 + 16
+    setPopup(r.bottom + 4 + height > window.innerHeight
+      ? { right, bottom: window.innerHeight - r.top + 4 }
+      : { right, top: r.bottom + 4 })
+  }
   return (
     <span title={title} style={{
       display: 'inline-flex', flexWrap: 'wrap',
       ...(stacked ? { flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' } : { columnGap: '0.6rem' }),
     }}>
-      {stores.filter(s => p.storeStock[s.id] != null).map(s => (
-        <span key={s.id} style={{ whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.name}</span>{' '}
-          <span className="badge badge-green">{p.storeStock[s.id]} stk</span>
+      {(showAll ? inStock : inStock.slice(0, SHOWN_STORES)).map(storeLine)}
+      {!showAll && hidden.length > 0 && (CAN_HOVER ? (
+        // The empty title keeps the "Sjekket" tooltip from showing on top of the popup
+        <span
+          title=""
+          onMouseEnter={openPopup}
+          onMouseLeave={() => setPopup(null)}
+          style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textDecoration: 'underline dotted' }}
+        >
+          og {hidden.length} til
+          {popup && (
+            <span style={{
+              position: 'fixed', ...popup, zIndex: 50,
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem',
+              padding: '0.5rem 0.65rem', background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 8, boxShadow: 'var(--shadow)',
+            }}>
+              {hidden.map(storeLine)}
+            </span>
+          )}
+        </span>
+      ) : (
+        <span
+          onClick={e => { e.stopPropagation(); setShowAll(true) }}
+          style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textDecoration: 'underline dotted' }}
+        >
+          og {hidden.length} til
         </span>
       ))}
     </span>
