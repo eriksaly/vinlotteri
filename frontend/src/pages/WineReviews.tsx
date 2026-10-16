@@ -9,7 +9,7 @@ import { Terningkast } from '../components/Terningkast'
 import { dateTime, formatVolume, twoDecimals } from '../components/WineProductInfo'
 import { PHONE_QUERY, useMediaQuery } from '../useMediaQuery'
 
-type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'score'
+type SortKey = 'name' | 'country' | 'region' | 'volume' | 'price' | 'pricePerScore' | 'stock' | 'reviewed' | 'score'
 type SortDir = 'asc' | 'desc'
 
 // `stores` are the stores the stock column shows
@@ -21,19 +21,20 @@ const SORT_VALUE: Record<SortKey, (p: WineProduct, stores: VmpStore[]) => string
   price: p => p.price,
   pricePerScore: p => p.pricePerScore,
   stock: (p, stores) => stockAt(p, stores),
+  reviewed: p => Date.parse(p.lastReviewedAt),
   score: p => p.score,
 }
 
 // Column headers, and the sort dropdown that replaces them on phones. The stock column is named after
 // its store when it shows only one (stockLabel).
 const SORT_LABEL: Record<SortKey, string> = {
-  name: 'Navn', country: 'Land', region: 'Region', volume: 'Volum', price: 'Pris', pricePerScore: 'Pris/poeng', stock: 'Lager', score: 'Vurdering',
+  name: 'Navn', country: 'Land', region: 'Region', volume: 'Volum', price: 'Pris', pricePerScore: 'Pris/poeng', stock: 'Lager', reviewed: 'Anmeldt', score: 'Vurdering',
 }
 const PRICE_PER_SCORE_HINT = 'Literpris delt på poeng. Lavere er bedre kjøp.'
 
-// Text A–Z, smallest, cheapest and best value first; stock and rating highest first
+// Text A–Z, smallest, cheapest and best value first; stock and rating highest first, newest review first
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
-  name: 'asc', country: 'asc', region: 'asc', volume: 'asc', price: 'asc', pricePerScore: 'asc', stock: 'desc', score: 'desc',
+  name: 'asc', country: 'asc', region: 'asc', volume: 'asc', price: 'asc', pricePerScore: 'asc', stock: 'desc', reviewed: 'desc', score: 'desc',
 }
 
 // Horten is chosen until the user picks other stores
@@ -44,6 +45,9 @@ function stockAt(p: WineProduct, stores: VmpStore[]): number | null {
   if (!stores.some(s => s.stockCheckedAt != null)) return null
   return stores.reduce((sum, s) => sum + (p.storeStock[s.id] ?? 0), 0)
 }
+
+// The date of a review, e.g. 16.10.2026
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString('nb-NO')
 
 const stockLabel = (stores: VmpStore[]) => stores.length === 1 ? stores[0].name : SORT_LABEL.stock
 
@@ -351,6 +355,12 @@ function WineReviewList() {
       {labels[k]} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
     </th>
   )
+  // A sort control that isn't a whole header cell
+  const sortLabel = (k: SortKey) => (
+    <span onClick={() => toggleSort(k)} style={{ cursor: 'pointer', color: sort.key === k ? 'var(--wine)' : undefined }}>
+      {labels[k]} {sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+    </span>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -523,7 +533,11 @@ function WineReviewList() {
                   {sortHeader('price', 'right')}
                   {sortHeader('pricePerScore', 'right', PRICE_PER_SCORE_HINT)}
                   {sortHeader('stock', 'right')}
-                  {sortHeader('score', 'right')}
+                  {/* The review date is too minor for a column of its own, so it's sorted from under the score */}
+                  <th style={{ textAlign: 'right', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                    {sortLabel('score')}
+                    <div style={{ fontSize: '0.75rem', fontWeight: 400, marginTop: '0.1rem' }}>{sortLabel('reviewed')}</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -588,6 +602,7 @@ const ProductRow = memo(function ProductRow({ p, stores, expanded, reviews, onTo
           <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{p.score}</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}> p</span>
           <Terningkast grade={p.grade} size={28} style={{ marginLeft: '0.5rem' }} />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatDate(p.lastReviewedAt)}</div>
           {p.reviewCount > 1 && (
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {p.reviewCount} anmeldelser {expanded ? '▴' : '▾'}
@@ -650,6 +665,7 @@ const PhoneProductRow = memo(function PhoneProductRow({ p, stores, expanded, rev
           <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{p.score}</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}> p</span>
           <Terningkast grade={p.grade} size={24} style={{ marginLeft: '0.35rem' }} />
+          <div style={muted}>{formatDate(p.lastReviewedAt)}</div>
           {p.reviewCount > 1 && <div style={muted}>{p.reviewCount} anm. {expanded ? '▴' : '▾'}</div>}
         </div>
       </div>
@@ -708,7 +724,7 @@ function ReviewList({ reviews }: { reviews: WineReview[] }) {
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
             <strong style={{ color: 'var(--text)' }}>{r.vintage ?? 'Uten årgang'}</strong>
             {' · '}{r.score} p · <Terningkast grade={r.grade} size={18} />
-            {' · '}{new Date(r.reviewedAt).toLocaleDateString('nb-NO')}
+            {' · '}{formatDate(r.reviewedAt)}
             {r.price != null && ` · ${r.price.toFixed(2)} kr ved anmeldelse`}
           </div>
           {r.lead && <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{r.lead}</div>}
