@@ -9,6 +9,11 @@ spring:
       # Runs docker-compose.yml on startup and points the datasource at its db service. Leaves the database
       # running when the app stops, so restarts are quick. Not in the packaged jar, so production is unaffected
       lifecycle-management: start-only
+  devtools:
+    # Restarts the app when IntelliJ recompiles; also left out of the packaged jar. Vite reloads the
+    # browser, so devtools' own LiveReload server isn't needed
+    livereload:
+      enabled: false
   security:
     oauth2:
       client:

@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="backend + frontend" type="CompoundRunConfigurationType">
+    <toRun name="backend" type="SpringBootApplicationConfigurationType" />
+    <toRun name="frontend dev" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>
