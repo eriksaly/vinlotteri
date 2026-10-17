@@ -33,6 +33,7 @@ build/
 .vscode/
 
 ### Local secrets ###
+.env
 src/main/resources/application-local.yaml
 frontend/node_modules/
 

@@ -1,6 +1,14 @@
 spring:
   application:
     name: wine-for-all
+  config:
+    # Local settings shared with docker-compose.yml; real environment variables still win
+    import: optional:file:.env[.properties]
+  docker:
+    compose:
+      # Runs docker-compose.yml on startup and points the datasource at its db service. Leaves the database
+      # running when the app stops, so restarts are quick. Not in the packaged jar, so production is unaffected
+      lifecycle-management: start-only
   security:
     oauth2:
       client:
@@ -10,9 +18,9 @@ spring:
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: openid,email,profile
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/wineforall}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:wineforall}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 5
