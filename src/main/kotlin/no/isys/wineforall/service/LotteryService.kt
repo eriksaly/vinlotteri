@@ -14,6 +14,7 @@ class LotteryService(
     private val ticketRepo: TicketRepository,
     private val winnerRepo: WinnerRepository,
     private val prizeRepo: LotteryPrizeRepository,
+    private val inventoryService: InventoryService,
     @Value("\${app.vipps-number}") private val vippsNumber: String,
     @Value("\${app.price-per-ticket:5}") private val pricePerTicket: Int
 ) {
@@ -321,7 +322,7 @@ class LotteryService(
 
     private fun buildStatistics(lottery: Lottery): StatisticsDto {
         val tickets = ticketRepo.findAllByLotteryWithParticipant(lottery)
-        val winners = winnerRepo.findAllByLotteryOrderByPosition(lottery)
+        val winners = winnerRepo.findAllByLotteryWithPrizeOrderByPosition(lottery)
         val totalTickets = tickets.size.toLong()
 
         val participantStats = tickets.groupBy { it.participant.id }.map { (_, pTickets) ->
@@ -376,6 +377,7 @@ class LotteryService(
         participantId = participant.id,
         participantName = participant.name,
         participantTag = participant.tag,
-        drawnAt = drawnAt
+        drawnAt = drawnAt,
+        prize = with(inventoryService) { prize?.toDto(id) }
     )
 }

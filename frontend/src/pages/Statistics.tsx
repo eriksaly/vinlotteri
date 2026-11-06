@@ -239,13 +239,25 @@ export default function StatisticsPage() {
                               <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Vinnere
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {lottery.winners.map(w => (
-                                  <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 800, color: 'var(--wine)', minWidth: '1.5rem', fontSize: '1.1rem' }}>
                                       {`#${w.position}`}
                                     </span>
-                                    <span style={{ fontWeight: 700 }}>{w.participantTag}</span>
+                                    <span style={{ fontWeight: 700, minWidth: '4rem' }}>{w.participantTag}</span>
+                                    {w.prize && w.prize.items.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: '1 1 12rem', minWidth: 0 }}>
+                                        {w.prize.items.map((item, i) => (
+                                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <img src={item.imageUrl} alt=""
+                                              style={{ width: 28, height: 40, objectFit: 'contain', flexShrink: 0 }}
+                                              onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                                            <span style={{ fontSize: '0.85rem' }}>{item.name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                     <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                       lodd #{w.ticketNumber}
                                     </span>

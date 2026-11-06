@@ -3,8 +3,10 @@ package no.isys.wineforall.service
 import no.isys.wineforall.dto.BulkAddInventoryRequest
 import no.isys.wineforall.dto.CreateInventoryItemRequest
 import no.isys.wineforall.dto.InventoryItemDto
+import no.isys.wineforall.dto.LotteryPrizeDto
 import no.isys.wineforall.dto.UpdateInventoryItemRequest
 import no.isys.wineforall.model.InventoryItem
+import no.isys.wineforall.model.LotteryPrize
 import no.isys.wineforall.repository.InventoryItemRepository
 import no.isys.wineforall.repository.LotteryPrizeRepository
 import no.isys.wineforall.repository.PrizeItemSlotRepository
@@ -106,5 +108,13 @@ class InventoryService(
         createdAt = createdAt,
         vgScore = rating?.score,
         vgGrade = rating?.grade
+    )
+
+    // A won prize, with one entry per bottle so a prize of two of the same wine shows both
+    fun LotteryPrize.toDto(winnerId: Long) = LotteryPrizeDto(
+        id = id,
+        position = position,
+        items = slots.flatMap { slot -> List(slot.quantity) { slot.inventoryItem.toDto() } },
+        winnerId = winnerId
     )
 }

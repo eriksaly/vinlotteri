@@ -1,7 +1,6 @@
 package no.isys.wineforall.service
 
 import no.isys.wineforall.dto.DrawResultDto
-import no.isys.wineforall.dto.LotteryPrizeDto
 import no.isys.wineforall.dto.WinnerDto
 import no.isys.wineforall.model.LotteryStatus
 import no.isys.wineforall.repository.LotteryRepository
@@ -48,7 +47,7 @@ class DrawingService(
 
         val remainingCount = ticketRepo.findAllByLotteryAndWon(lottery, false).size.toLong()
 
-        val prizeDto = prize?.toDto(winner.id)
+        val prizeDto = with(inventoryService) { prize?.toDto(winner.id) }
 
         return DrawResultDto(
             winner = WinnerDto(
@@ -78,17 +77,8 @@ class DrawingService(
                 participantName = w.participant.name,
                 participantTag = w.participant.tag,
                 drawnAt = w.drawnAt,
-                prize = w.prize?.toDto(w.id)
+                prize = with(inventoryService) { w.prize?.toDto(w.id) }
             )
         }
     }
-
-    private fun no.isys.wineforall.model.LotteryPrize.toDto(winnerId: Long) = LotteryPrizeDto(
-        id = id,
-        position = position,
-        items = slots.flatMap { slot ->
-            List(slot.quantity) { with(inventoryService) { slot.inventoryItem.toDto() } }
-        },
-        winnerId = winnerId
-    )
 }
