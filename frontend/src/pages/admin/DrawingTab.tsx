@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import api from '../../api/client'
 import { playTick, playWinnerSound, preloadOpenings, type Opening } from '../../audio'
 import type { Buyer, LotteryInfo, LotteryPrize, Winner, DrawResult } from '../../types'
-import { useConfirm, isBeer } from './shared'
+import { useConfirm, isBeer, isSpirit, isSparkling } from './shared'
 import OpeningCelebration from './OpeningCelebration'
 
 const OVERLAY_Z = 2000
@@ -492,9 +492,14 @@ function winesLeftMessage(n: number): string {
   return `🍾 ${n} flasker lurer på hvem som er heldig`
 }
 
-// A can opening for an all-beer prize, a cork popping for anything else
+// A cork popping if the prize has bubbles in it, a can for all beer, a spirit bottle for all spirits,
+// and a wine bottle uncorked and poured for anything else
 function openingFor(prize: LotteryPrize | undefined): Opening {
-  return prize != null && prize.items.length > 0 && prize.items.every(i => isBeer(i.category)) ? 'can' : 'cork'
+  const items = prize?.items ?? []
+  if (items.some(i => isSparkling(i.category))) return 'sparkling'
+  if (items.length > 0 && items.every(i => isBeer(i.category))) return 'can'
+  if (items.length > 0 && items.every(i => isSpirit(i.category))) return 'spirit'
+  return 'wine'
 }
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────

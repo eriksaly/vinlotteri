@@ -157,11 +157,23 @@ a:hover { text-decoration: underline; }
 .opening svg { display: block; overflow: visible; transform-origin: 50% 100%; }
 .opening-bottle {
   height: min(34vh, 24vw);
+  animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
+}
+.opening-bottle.opening-fizzy {
   animation: opening-in 0.25s ease-out both, opening-shake var(--pop) linear, opening-recoil 0.35s ease-out var(--pop);
 }
 .opening-can {
   height: min(24vh, 17vw);
   animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
+}
+.opening-spirit {
+  height: min(30vh, 21vw);
+  animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
+}
+/* Eased up a little before the pop, then slides off. The pull is listed last so it wins until the pop */
+.opening-uncork {
+  transform-box: fill-box; transform-origin: center;
+  animation: opening-uncork 0.8s cubic-bezier(0.2, 0.6, 0.4, 1) var(--pop) both, opening-uncork-pull var(--pop) ease-in;
 }
 .opening-cork {
   transform-box: fill-box; transform-origin: center;
@@ -182,6 +194,11 @@ a:hover { text-decoration: underline; }
   75% { transform: rotate(-2.5deg); }
 }
 @keyframes opening-recoil { 30% { transform: translateY(5%); } }
+@keyframes opening-uncork-pull { to { transform: translateY(-6px); } }
+@keyframes opening-uncork {
+  from { transform: translateY(-6px); }
+  to { transform: translateY(-260px) rotate(-200deg); opacity: 0; }
+}
 @keyframes opening-cork { to { transform: translateY(-420px) rotate(720deg); opacity: 0; } }
 @keyframes opening-tab {
   53% { transform: rotate(-75deg); }

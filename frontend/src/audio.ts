@@ -26,17 +26,22 @@ export function playTick(speed: number) {
   } catch { /* ignore */ }
 }
 
-// Recorded opening sounds, played as the winner is revealed
+// Recorded opening sounds, played as the winner is revealed. Only bubbles pop; a still wine or a
+// spirit is uncorked quietly and poured
 const OPENINGS = {
   can: '/sounds/can-open.mp3',
-  cork: '/sounds/cork-pop.mp3',
+  sparkling: '/sounds/cork-pop.mp3',
+  wine: '/sounds/uncork.m4a',
+  spirit: '/sounds/uncork.m4a',
 }
 export type Opening = keyof typeof OPENINGS
 
-// Seconds into each clip where the cork pops or the can cracks open, for timing the animation to it
+// Seconds into each clip where the cork comes out or the can cracks open, for timing the animation to it
 export const POP_AT: Record<Opening, number> = {
   can: 0.52,
-  cork: 0.36,
+  sparkling: 0.36,
+  wine: 0.28,
+  spirit: 0.28,
 }
 
 const samples = new Map<string, Promise<AudioBuffer | null>>()

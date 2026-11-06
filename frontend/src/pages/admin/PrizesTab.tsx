@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
 import type { LotteryInfo, LotteryPrize, InventoryItem } from '../../types'
-import { InventoryItemPicker, ImageLightbox, isBeer } from './shared'
+import { InventoryItemPicker, ImageLightbox, isBeer, isSpirit } from './shared'
 import { VgRating } from '../../components/Terningkast'
 
 // Shared by the prize count input and the buttons next to it, so they line up
@@ -70,9 +70,6 @@ export default function PrizesTab({ lottery }: { lottery: LotteryInfo | null }) 
 
     const undrawnPrizes = prizes.filter(p => p.winnerId == null)
     if (undrawnPrizes.length === 0) return
-
-    const SPIRIT_SUBCATS = ['gin', 'whisky', 'whiskey', 'akevitt', 'brennevin', 'druebrennevin', 'likør', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac']
-    const isSpirit = (cat: string) => SPIRIT_SUBCATS.some(s => cat.toLowerCase().includes(s))
 
     // Beer: prefer a country-group of 3 unique types, fall back to however many are available
     const allBeers = [...inventory].filter(i => isBeer(i.category))

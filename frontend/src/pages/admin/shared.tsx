@@ -438,6 +438,11 @@ export const isBeer = (cat: string) => {
   return c === 'øl' || c.includes('øl') || BEER_SUBCATS.some(s => c.includes(s))
 }
 
+const SPIRIT_SUBCATS = ['gin', 'whisky', 'whiskey', 'akevitt', 'brennevin', 'druebrennevin', 'likør', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac']
+export const isSpirit = (cat: string) => SPIRIT_SUBCATS.some(s => cat.toLowerCase().includes(s))
+
+export const isSparkling = (cat: string) => ['musserende', 'champagne'].some(s => cat.toLowerCase().includes(s))
+
 export function tagColor(tag: string) {
   const colors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
   let hash = 0
