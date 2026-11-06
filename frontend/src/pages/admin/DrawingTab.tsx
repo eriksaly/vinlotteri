@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
-import confetti from 'canvas-confetti'
 import api from '../../api/client'
-import { playTick, playWin } from '../../audio'
+import { playTick, playWinnerSound, preloadOpenings, type Opening } from '../../audio'
 import type { Buyer, LotteryInfo, LotteryPrize, Winner, DrawResult } from '../../types'
-import { useConfirm } from './shared'
+import { useConfirm, isBeer } from './shared'
+import OpeningCelebration from './OpeningCelebration'
 
 const OVERLAY_Z = 2000
 const CONFETTI_Z = OVERLAY_Z + 1000
@@ -76,6 +76,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
     setShowWheel(true)
     setPhase('spinning')
     setLatestWinner(null)
+    preloadOpenings()
 
     // Wait two frames for overlay to mount and ResizeObserver to fire
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
@@ -105,7 +106,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
       setBuyers(b.data)
       setPrizes(p.data)
       setPhase('winner')
-      fireConfetti()
+      playWinnerSound(openingFor(p.data.find(prize => prize.position === result.data.winner.position)))
     } catch (e: unknown) {
       rejectWinner(e)
       setPhase('idle')
@@ -389,6 +390,15 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                 </div>
               )}
 
+              {/* ── winner phase: the prize opened on both sides, in time with its sound ── */}
+              {phase === 'winner' && latestWinner && (
+                <OpeningCelebration
+                  key={latestWinner.position}
+                  opening={openingFor(prizes.find(p => p.position === latestWinner.position))}
+                  zIndex={CONFETTI_Z}
+                />
+              )}
+
               {/* ── winner phase: announcement ── */}
               {phase === 'winner' && latestWinner && (
                 <div style={{
@@ -482,16 +492,9 @@ function winesLeftMessage(n: number): string {
   return `🍾 ${n} flasker lurer på hvem som er heldig`
 }
 
-function fireConfetti() {
-  playWin()
-  const end = Date.now() + 3500
-  const colors = ['#b32020', '#c86a10', '#a08a00', '#1e7a38', '#1a4db0', '#6b1a80']
-  const frame = () => {
-    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors, zIndex: CONFETTI_Z })
-    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors, zIndex: CONFETTI_Z })
-    if (Date.now() < end) requestAnimationFrame(frame)
-  }
-  frame()
+// A can opening for an all-beer prize, a cork popping for anything else
+function openingFor(prize: LotteryPrize | undefined): Opening {
+  return prize != null && prize.items.length > 0 && prize.items.every(i => isBeer(i.category)) ? 'can' : 'cork'
 }
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────
@@ -511,6 +514,24 @@ function getWheelSegments(buyerList: Buyer[]) {
   })
 }
 
+type WheelSegment = ReturnType<typeof getWheelSegments>[number]
+
+// Width of the white lines between slices, as an angle at the rim. Thin slices get thinner
+// lines, so every slice keeps colour on both sides of where the wheel can stop
+function separatorAngle(segs: WheelSegment[]) {
+  return Math.min(0.008, Math.min(...segs.map(s => s.end - s.start)) / 6)
+}
+
+// Where on the slice the pointer stops for one of the buyer's tickets. Tickets are spread over the
+// slice minus a margin at each edge (the line's half-width plus as much again), so the wheel can
+// never stop on a separator, whatever the ticket
+function landingAngle(seg: WheelSegment, segs: WheelSegment[], ticketNumber: number) {
+  const margin = 2 * separatorAngle(segs)
+  const idx = seg.ticketsSorted.indexOf(ticketNumber)
+  const fraction = idx >= 0 ? (idx + 0.5) / seg.ticketsSorted.length : 0.5
+  return seg.start + margin + fraction * (seg.end - seg.start - 2 * margin)
+}
+
 function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerList: Buyer[]) {
   if (!canvas) return
   const ctx = canvas.getContext('2d')!
@@ -523,26 +544,39 @@ function drawWheelFrame(canvas: HTMLCanvasElement | null, angle: number, buyerLi
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
     ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fill(); return
   }
+  const cr = r * 0.07
+  const dpr = window.devicePixelRatio || 1
+  const textEnd = r * 0.93
+  const lineWidth = r * separatorAngle(segs)
   for (const seg of segs) {
     ctx.beginPath(); ctx.moveTo(cx, cy)
     ctx.arc(cx, cy, r, seg.start + angle, seg.end + angle)
     ctx.closePath(); ctx.fillStyle = seg.color; ctx.fill()
-    ctx.strokeStyle = 'white'; ctx.lineWidth = Math.max(1, r * 0.008); ctx.stroke()
-    const sweep = seg.end - seg.start
-    if (sweep > 0.12) {
-      const ma = seg.mid + angle
-      const fontSize = Math.max(r * 0.04, Math.min(r * 0.065, sweep * r * 0.06))
-      ctx.save()
-      ctx.translate(cx, cy)
-      ctx.rotate(ma)
-      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'
-      ctx.font = `bold ${fontSize}px sans-serif`
-      ctx.fillStyle = 'white'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 3
-      ctx.fillText(seg.buyer.participant.tag, r * 0.9, 0)
-      ctx.restore()
-    }
+    ctx.strokeStyle = 'white'; ctx.lineWidth = lineWidth; ctx.stroke()
   }
-  const cr = r * 0.07
+  // Every slice gets its label, however thin: the font shrinks until the text fits
+  // the slice's width at its inner end (where the slice is narrowest) and stays
+  // clear of the hub.
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'white'; ctx.shadowColor = 'rgba(0,0,0,0.6)'
+  for (const seg of segs) {
+    const tag = seg.buyer.participant.tag
+    const sweep = seg.end - seg.start
+    ctx.font = 'bold 100px sans-serif'
+    const widthPerPx = ctx.measureText(tag).width / 100
+    // Slice width per unit radius, with a little breathing room between labels
+    const h = 2 * Math.sin(Math.min(sweep, Math.PI) / 2) * 0.85
+    const fitsSlice = (h * textEnd) / (1 + h * widthPerPx)
+    const fitsRadius = (textEnd - cr * 1.6) / widthPerPx
+    const fontSize = Math.max(7 * dpr, Math.min(r * 0.065, fitsSlice, fitsRadius))
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(seg.mid + angle)
+    ctx.font = `bold ${fontSize}px sans-serif`
+    ctx.shadowBlur = Math.min(3, fontSize / 6)
+    ctx.fillText(tag, textEnd, 0)
+    ctx.restore()
+  }
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 2 * Math.PI)
   ctx.fillStyle = 'white'; ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke()
   const pw = r * 0.055, ph = r * 0.12
@@ -614,11 +648,10 @@ const SpinningWheel = forwardRef<WheelHandle, { buyers: Buyer[]; angleRef: React
         }
         rafRef.current = requestAnimationFrame(loop)
         winnerPromise.then(({ participantId, ticketNumber }) => {
-          const ws = getWheelSegments(snap).find(s => s.buyer.participant.id === participantId)
+          const segs = getWheelSegments(snap)
+          const ws = segs.find(s => s.buyer.participant.id === participantId)
           if (!ws) return
-          const idx = ws.ticketsSorted.indexOf(ticketNumber)
-          const fraction = idx >= 0 ? (idx + 0.5) / ws.ticketsSorted.length : 0.5
-          const targetAngle = ws.start + fraction * (ws.end - ws.start)
+          const targetAngle = landingAngle(ws, segs, ticketNumber)
           const base = -Math.PI / 2 - targetAngle
           const cur = angleRef.current
           const k = Math.ceil((cur + 10 * 2 * Math.PI - base) / (2 * Math.PI))

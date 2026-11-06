@@ -152,6 +152,47 @@ a:hover { text-decoration: underline; }
   from { opacity: 0; transform: scale(0.95) translateY(-8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+/* The bottle or can opened beside a drawn winner; --pop is when the opening sound pops */
+.opening { position: absolute; top: 50%; pointer-events: none; }
+.opening svg { display: block; overflow: visible; transform-origin: 50% 100%; }
+.opening-bottle {
+  height: min(34vh, 24vw);
+  animation: opening-in 0.25s ease-out both, opening-shake var(--pop) linear, opening-recoil 0.35s ease-out var(--pop);
+}
+.opening-can {
+  height: min(24vh, 17vw);
+  animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
+}
+.opening-cork {
+  transform-box: fill-box; transform-origin: center;
+  animation: opening-cork 0.9s cubic-bezier(0.15, 0.7, 0.35, 1) var(--pop) both;
+}
+/* Lifts from the click just before the crack, then settles back */
+.opening-tab {
+  transform-box: view-box; transform-origin: 40px 12.5px;
+  animation: opening-tab 0.6s ease-in-out calc(var(--pop) - 0.32s) both;
+}
+.opening-hole { animation: opening-show 0.01s var(--pop) both; }
+.opening-drop { transform-box: fill-box; transform-origin: center; animation: opening-drop 0.8s ease-out both; }
+@keyframes opening-in { from { opacity: 0; } }
+@keyframes opening-shake {
+  0%, 100% { transform: none; }
+  25% { transform: rotate(-1.5deg); }
+  50% { transform: rotate(2deg); }
+  75% { transform: rotate(-2.5deg); }
+}
+@keyframes opening-recoil { 30% { transform: translateY(5%); } }
+@keyframes opening-cork { to { transform: translateY(-420px) rotate(720deg); opacity: 0; } }
+@keyframes opening-tab {
+  53% { transform: rotate(-75deg); }
+  to { transform: rotate(-15deg); }
+}
+@keyframes opening-show { from { opacity: 0; } to { opacity: 1; } }
+@keyframes opening-drop {
+  0% { opacity: 0; transform: scale(0.3); }
+  15% { opacity: 1; }
+  to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.2); }
+}
 .modal-header { padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 1.05rem; }
 .modal-body   { padding: 1.5rem; }
 .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
