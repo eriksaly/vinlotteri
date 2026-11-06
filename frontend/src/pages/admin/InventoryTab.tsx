@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../../api/client'
 import type { InventoryItem, VinmonopoletProduct } from '../../types'
-import { useConfirm } from './shared'
+import { useConfirm, ImageLightbox, CategoryChips, filterInventory } from './shared'
 import { VgRating } from '../../components/Terningkast'
 
 export default function InventoryTab() {
@@ -17,6 +17,9 @@ export default function InventoryTab() {
   const [lookupPreview, setLookupPreview] = useState<VinmonopoletProduct | null>(null)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState<string | null>(null)
   const quickRef = useRef<HTMLInputElement>(null)
   const { confirm, dialog } = useConfirm()
 
@@ -140,6 +143,9 @@ export default function InventoryTab() {
     return sum + (isBeer ? Math.floor(item.quantity / 3) : item.quantity)
   }, 0)
 
+  const shown = filterInventory(items, search, category)
+  const filtering = shown.length !== items.length
+
   if (loading) return <div className="card"><div className="card-body">Laster lager...</div></div>
 
   return (
@@ -188,7 +194,9 @@ export default function InventoryTab() {
               <img
                 src={`https://bilder.vinmonopolet.no/cache/1200x1200-0/${lookupPreview.code}-1.jpg`}
                 alt={lookupPreview.name}
-                style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
+                onClick={e => setLightbox({ src: (e.target as HTMLImageElement).src, alt: lookupPreview.name })}
+                title="Klikk for å forstørre"
+                style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 4, flexShrink: 0, cursor: 'zoom-in' }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
               <div style={{ flex: 1 }}>
@@ -209,7 +217,7 @@ export default function InventoryTab() {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span>Lagerbeholdning ({items.length} produkter)</span>
+            <span>Lagerbeholdning ({filtering ? `${shown.length} av ${items.length}` : items.length} produkter)</span>
             <span style={{
               background: 'var(--wine)', color: 'white',
               borderRadius: 20, padding: '0.15rem 0.75rem',
@@ -263,9 +271,29 @@ export default function InventoryTab() {
           </div>
         )}
 
+        {items.length > 0 && (
+          <div className="card-body" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+            <input
+              className="form-control"
+              style={{ width: 240, maxWidth: '100%' }}
+              placeholder="Søk navn, land eller varenr..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              aria-label="Søk i lageret"
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              <CategoryChips active={category} onChange={setCategory} />
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
             Lageret er tomt. Legg til flasker manuelt eller importer fra Fyll kjelleren-fanen.
+          </div>
+        ) : shown.length === 0 ? (
+          <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+            Ingen flasker matcher filteret.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -283,13 +311,15 @@ export default function InventoryTab() {
                 </tr>
               </thead>
               <tbody>
-                {items.map(item => (
+                {shown.map(item => (
                   <tr key={item.id}>
                     <td>
                       <img
                         src={item.imageUrl}
                         alt={item.name}
-                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4 }}
+                        onClick={() => setLightbox({ src: item.imageUrl, alt: item.name })}
+                        title="Klikk for å forstørre"
+                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, cursor: 'zoom-in' }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
                     </td>
@@ -349,6 +379,9 @@ export default function InventoryTab() {
           </div>
         )}
       </div>
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   )
 }

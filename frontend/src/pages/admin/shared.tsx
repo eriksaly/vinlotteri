@@ -148,6 +148,46 @@ const CATEGORY_CHIPS: { key: string; label: string; categories: string[] }[] = [
   { key: 'spirit',   label: '🥃 Sprit',      categories: ['brennevin', 'gin', 'whisky', 'whiskey', 'akevitt', 'druebrennevin', 'rom', 'vodka', 'tequila', 'cognac', 'armagnac', 'likør'] },
 ]
 
+// The items in the chip's category whose name, category, country or Vinmonopolet number contains the query
+export function filterInventory(items: InventoryItem[], query: string, chipKey: string | null) {
+  const q = query.trim().toLowerCase()
+  const chip = chipKey ? CATEGORY_CHIPS.find(c => c.key === chipKey) ?? null : null
+  return items.filter(i => {
+    if (chip) {
+      const cat = i.category.toLowerCase()
+      if (!chip.categories.some(c => cat.includes(c))) return false
+    }
+    if (q === '') return true
+    return (
+      i.name.toLowerCase().includes(q) ||
+      i.category.toLowerCase().includes(q) ||
+      i.country.toLowerCase().includes(q) ||
+      i.vinmonopoletCode.includes(q)
+    )
+  })
+}
+
+// "Alle" plus one chip per category; clicking the active chip turns it off again
+export function CategoryChips({ active, onChange }: { active: string | null; onChange: (key: string | null) => void }) {
+  return (
+    <>
+      <button type="button" onClick={() => onChange(null)} style={chipStyle(active === null)}>
+        Alle
+      </button>
+      {CATEGORY_CHIPS.map(c => (
+        <button
+          key={c.key}
+          type="button"
+          onClick={() => onChange(active === c.key ? null : c.key)}
+          style={chipStyle(active === c.key)}
+        >
+          {c.label}
+        </button>
+      ))}
+    </>
+  )
+}
+
 // A "+" button that opens a searchable list of the inventory, for adding a bottle to a prize
 export function InventoryItemPicker({
   items,
@@ -166,20 +206,7 @@ export function InventoryItemPicker({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const q = value.trim().toLowerCase()
-  const chip = activeChip ? CATEGORY_CHIPS.find(c => c.key === activeChip) ?? null : null
-  const filtered = items.filter(i => {
-    if (chip) {
-      const cat = i.category.toLowerCase()
-      if (!chip.categories.some(c => cat.includes(c))) return false
-    }
-    if (q === '') return true
-    return (
-      i.name.toLowerCase().includes(q) ||
-      i.category.toLowerCase().includes(q) ||
-      i.country.toLowerCase().includes(q)
-    )
-  })
+  const filtered = filterInventory(items, value, activeChip)
 
   useEffect(() => { setHighlighted(0) }, [value, activeChip])
 
@@ -300,23 +327,7 @@ export function InventoryItemPicker({
             />
             {/* preventDefault keeps the focus in the search field */}
             <div onMouseDown={e => e.preventDefault()} style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button
-                type="button"
-                onClick={() => setActiveChip(null)}
-                style={chipStyle(activeChip === null)}
-              >
-                Alle
-              </button>
-              {CATEGORY_CHIPS.map(c => (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => setActiveChip(activeChip === c.key ? null : c.key)}
-                  style={chipStyle(activeChip === c.key)}
-                >
-                  {c.label}
-                </button>
-              ))}
+              <CategoryChips active={activeChip} onChange={setActiveChip} />
             </div>
           </div>
           <div role="listbox" aria-label="Flasker på lager" style={{ overflowY: 'auto', flex: 1 }}>
@@ -419,6 +430,12 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string
       </button>
     </div>
   )
+}
+
+const BEER_SUBCATS = ['ale', 'lager', 'porter', 'stout', 'pils', 'hveteøl', 'surøl']
+export const isBeer = (cat: string) => {
+  const c = cat.toLowerCase()
+  return c === 'øl' || c.includes('øl') || BEER_SUBCATS.some(s => c.includes(s))
 }
 
 export function tagColor(tag: string) {
