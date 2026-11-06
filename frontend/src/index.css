@@ -166,15 +166,30 @@ a:hover { text-decoration: underline; }
   height: min(24vh, 17vw);
   animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
 }
+.opening-bottle.opening-still { animation: opening-in 0.25s ease-out both; }
 .opening-spirit {
   height: min(30vh, 21vw);
-  animation: opening-in 0.25s ease-out both, opening-recoil 0.35s ease-out var(--pop);
+  animation: opening-in 0.25s ease-out both;
 }
-/* Eased up a little before the pop, then slides off. The pull is listed last so it wins until the pop */
+/* Eased up a little before the pop, then lifted clear and gone rather than shot off. The pull is listed
+   last so it wins until the pop */
 .opening-uncork {
   transform-box: fill-box; transform-origin: center;
-  animation: opening-uncork 0.8s cubic-bezier(0.2, 0.6, 0.4, 1) var(--pop) both, opening-uncork-pull var(--pop) ease-in;
+  animation: opening-uncork 0.35s ease-out var(--pop) both, opening-uncork-pull var(--pop) ease-in;
 }
+/* A still bottle tips toward the winner once its cork is out, pours while the sound glugs, then rights itself */
+.opening-pourer {
+  transform-origin: 50% 75%;
+  animation: opening-tip 0.37s ease-in-out calc(var(--pop) + 0.05s) both,
+    opening-untip 0.6s ease-in-out calc(var(--pour-end) + 0.05s) forwards;
+}
+.opening-stream {
+  position: absolute; pointer-events: none; border-radius: 999px;
+  animation: opening-stream-in 0.15s ease-in var(--pour-start) both, opening-stream-out 0.25s ease-in var(--pour-end) forwards;
+}
+.opening-glass { position: absolute; pointer-events: none; animation: opening-in 0.25s ease-out both; }
+.opening-glass svg { display: block; width: 100%; overflow: visible; }
+.opening-fill { animation: opening-fill var(--pour-len) ease-out var(--pour-start) both; }
 .opening-cork {
   transform-box: fill-box; transform-origin: center;
   animation: opening-cork 0.9s cubic-bezier(0.15, 0.7, 0.35, 1) var(--pop) both;
@@ -197,8 +212,13 @@ a:hover { text-decoration: underline; }
 @keyframes opening-uncork-pull { to { transform: translateY(-6px); } }
 @keyframes opening-uncork {
   from { transform: translateY(-6px); }
-  to { transform: translateY(-260px) rotate(-200deg); opacity: 0; }
+  to { transform: translateY(-40px); opacity: 0; }
 }
+@keyframes opening-tip { from { transform: none; } to { transform: rotate(var(--pour-tilt)); } }
+@keyframes opening-untip { from { transform: rotate(var(--pour-tilt)); } to { transform: none; } }
+@keyframes opening-stream-in { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+@keyframes opening-stream-out { from { clip-path: inset(0); } to { clip-path: inset(100% 0 0 0); } }
+@keyframes opening-fill { from { transform: translateY(var(--empty)); } to { transform: none; } }
 @keyframes opening-cork { to { transform: translateY(-420px) rotate(720deg); opacity: 0; } }
 @keyframes opening-tab {
   53% { transform: rotate(-75deg); }

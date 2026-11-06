@@ -3,7 +3,7 @@ import api from '../../api/client'
 import { playTick, playWinnerSound, preloadOpenings, type Opening } from '../../audio'
 import type { Buyer, LotteryInfo, LotteryPrize, Winner, DrawResult } from '../../types'
 import { useConfirm, isBeer, isSpirit, isSparkling } from './shared'
-import OpeningCelebration from './OpeningCelebration'
+import OpeningCelebration, { type Drink } from './OpeningCelebration'
 
 const OVERLAY_Z = 2000
 const CONFETTI_Z = OVERLAY_Z + 1000
@@ -395,6 +395,7 @@ export default function DrawingTab({ lottery, onLotteryChange }: { lottery: Lott
                 <OpeningCelebration
                   key={latestWinner.position}
                   opening={openingFor(prizes.find(p => p.position === latestWinner.position))}
+                  drink={drinkFor(prizes.find(p => p.position === latestWinner.position))}
                   zIndex={CONFETTI_Z}
                 />
               )}
@@ -500,6 +501,21 @@ function openingFor(prize: LotteryPrize | undefined): Opening {
   if (items.length > 0 && items.every(i => isBeer(i.category))) return 'can'
   if (items.length > 0 && items.every(i => isSpirit(i.category))) return 'spirit'
   return 'wine'
+}
+
+// What gets poured into the glass: bubbles from a sparkling bottle, beer from a can, spirit from a spirit
+// bottle, and from a wine bottle red if the prize has any red wine, then rosé, then white. A prize with no
+// wine in it at all (a mix of beer and spirits, say) pours red
+function drinkFor(prize: LotteryPrize | undefined): Drink {
+  const opening = openingFor(prize)
+  if (opening === 'sparkling') return 'sparkling'
+  if (opening === 'can') return 'beer'
+  if (opening === 'spirit') return 'spirit'
+  const categories = (prize?.items ?? []).map(i => i.category.toLowerCase())
+  if (categories.some(c => c.includes('rødvin'))) return 'red'
+  if (categories.some(c => c.includes('rosé'))) return 'rose'
+  if (categories.some(c => c.includes('hvitvin'))) return 'white'
+  return 'red'
 }
 
 // ─── Spinning Wheel ───────────────────────────────────────────────────────────

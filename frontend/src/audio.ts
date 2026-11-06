@@ -44,6 +44,22 @@ export const POP_AT: Record<Opening, number> = {
   spirit: 0.28,
 }
 
+// Seconds into each clip where the pour starts and stops, once the bottle or can has opened and tipped:
+// while the uncorking clip glugs, and for the can and bubbles, while their pouring sounds play
+export const POUR_AT: Record<Opening, { start: number; end: number }> = {
+  can: { start: 0.95, end: 2.7 },
+  sparkling: { start: 0.8, end: 2.8 },
+  wine: { start: 0.7, end: 2.8 },
+  spirit: { start: 0.7, end: 2.8 },
+}
+
+// A separate pouring sound, started with the pour, for the can and the bubbles, whose own clips end at the
+// hiss and the pop: a can of beer, and a lighter, brighter champagne pour
+const POURS: Partial<Record<Opening, string>> = {
+  can: '/sounds/fizzy-pour.mp3',
+  sparkling: '/sounds/sparkling-pour.mp3',
+}
+
 const samples = new Map<string, Promise<AudioBuffer | null>>()
 
 function loadSample(c: AudioContext, url: string): Promise<AudioBuffer | null> {
@@ -62,18 +78,29 @@ function loadSample(c: AudioContext, url: string): Promise<AudioBuffer | null> {
 export function preloadOpenings() {
   const c = getCtx()
   if (!c) return
-  for (const url of Object.values(OPENINGS)) loadSample(c, url)
+  for (const url of [...Object.values(OPENINGS), ...Object.values(POURS)]) loadSample(c, url)
 }
 
+// The opening sound, and its pouring sound, if it has one, timed to start with the pour
 export async function playWinnerSound(opening: Opening) {
   const c = getCtx()
   if (!c) return
-  const buffer = await loadSample(c, OPENINGS[opening])
+  const pourUrl = POURS[opening]
+  const [buffer, pour] = await Promise.all([
+    loadSample(c, OPENINGS[opening]),
+    pourUrl ? loadSample(c, pourUrl) : Promise.resolve(null),
+  ])
+  const now = c.currentTime
+  play(c, buffer, now)
+  play(c, pour, now + POUR_AT[opening].start)
+}
+
+function play(c: AudioContext, buffer: AudioBuffer | null, at: number) {
   if (!buffer) return
   try {
     const src = c.createBufferSource()
     src.buffer = buffer
     src.connect(c.destination)
-    src.start()
+    src.start(at)
   } catch { /* ignore */ }
 }
