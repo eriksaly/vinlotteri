@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
-import type { AllTimeStatistics, LotteryStatistics, Streak } from '../types'
+import type { AllTimeStatistics, InventoryItem, LotteryStatistics, Streak, Winner } from '../types'
 import NavBar from '../components/NavBar'
+import { ImageLightbox } from './admin/shared'
 
 export default function StatisticsPage() {
   const [stats, setStats] = useState<AllTimeStatistics | null>(null)
   const [lotteries, setLotteries] = useState<LotteryStatistics[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedLottery, setExpandedLottery] = useState<number | null>(null)
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
+  const [selectedParticipant, setSelectedParticipant] = useState<SelectedParticipant | null>(null)
   useEffect(() => {
     api.get<AllTimeStatistics>('/api/statistics')
       .then(r => setStats(r.data))
@@ -80,7 +83,7 @@ export default function StatisticsPage() {
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                   <div>
-                                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                    <ParticipantLink id={p.participantId} name={p.name} onOpen={setSelectedParticipant} style={{ fontWeight: 600 }} />
                                     {i === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--gold)' }}>👑 Universets yndling</div>}
                                   </div>
                                 </div>
@@ -120,7 +123,7 @@ export default function StatisticsPage() {
                               </td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                  <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                  <ParticipantLink id={p.participantId} name={p.name} onOpen={setSelectedParticipant} style={{ fontWeight: 600 }} />
                                 </div>
                               </td>
                               <td>
@@ -157,7 +160,7 @@ export default function StatisticsPage() {
                           <td><MedalBadge rank={i} /></td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <span style={{ fontWeight: 600 }}>{p.name}</span>
+                              <ParticipantLink id={p.participantId} name={p.name} onOpen={setSelectedParticipant} style={{ fontWeight: 600 }} />
                             </div>
                           </td>
                           <td style={{ fontWeight: 700 }}>
@@ -187,8 +190,8 @@ export default function StatisticsPage() {
               {/* Streaks */}
               {(stats.longestWinStreak.length > 0 || stats.longestLoseStreak.length > 0) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                  {stats.longestWinStreak.length > 0 && <StreakCard streaks={stats.longestWinStreak} type="win" />}
-                  {stats.longestLoseStreak.length > 0 && <StreakCard streaks={stats.longestLoseStreak} type="lose" />}
+                  {stats.longestWinStreak.length > 0 && <StreakCard streaks={stats.longestWinStreak} type="win" onOpenParticipant={setSelectedParticipant} />}
+                  {stats.longestLoseStreak.length > 0 && <StreakCard streaks={stats.longestLoseStreak} type="lose" onOpenParticipant={setSelectedParticipant} />}
                 </div>
               )}
 
@@ -219,13 +222,14 @@ export default function StatisticsPage() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {/* The expanded view lists the winners in full, so the summary badges only show while collapsed */}
+                            {expandedLottery !== lottery.lotteryId && <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                               {lottery.winners.map(w => (
                                 <span key={w.position} className="badge badge-wine" style={{ fontSize: '0.7rem' }}>
                                   #{w.position} {w.participantTag}
                                 </span>
                               ))}
-                            </div>
+                            </div>}
                             <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', flexShrink: 0 }}>
                               {expandedLottery === lottery.lotteryId ? '▲' : '▼'}
                             </span>
@@ -239,30 +243,8 @@ export default function StatisticsPage() {
                               <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Vinnere
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {lottery.winners.map(w => (
-                                  <div key={w.position} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 800, color: 'var(--wine)', minWidth: '1.5rem', fontSize: '1.1rem' }}>
-                                      {`#${w.position}`}
-                                    </span>
-                                    <span style={{ fontWeight: 700, minWidth: '4rem' }}>{w.participantTag}</span>
-                                    {w.prize && w.prize.items.length > 0 && (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: '1 1 12rem', minWidth: 0 }}>
-                                        {w.prize.items.map((item, i) => (
-                                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <img src={item.imageUrl} alt=""
-                                              style={{ width: 28, height: 40, objectFit: 'contain', flexShrink: 0 }}
-                                              onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
-                                            <span style={{ fontSize: '0.85rem' }}>{item.name}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                      lodd #{w.ticketNumber}
-                                    </span>
-                                  </div>
-                                ))}
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '0.75rem' }}>
+                                {lottery.winners.map(w => <WinnerCard key={w.position} winner={w} onImageClick={setLightbox} onOpenParticipant={setSelectedParticipant} />)}
                               </div>
                             </div>
 
@@ -277,7 +259,7 @@ export default function StatisticsPage() {
                                     <tr key={p.participantId}>
                                       <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                          <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                          <ParticipantLink id={p.participantId} name={p.name} onOpen={setSelectedParticipant} style={{ fontWeight: 600 }} />
                                         </div>
                                       </td>
                                       <td style={{ fontWeight: 700 }}>{p.ticketsBought}</td>
@@ -310,6 +292,13 @@ export default function StatisticsPage() {
           )}
         </div>
       </div>
+      {selectedParticipant && (
+        <WinningsModal participant={selectedParticipant} lotteries={lotteries} lightboxOpen={lightbox !== null}
+          onImageClick={setLightbox} onClose={() => setSelectedParticipant(null)} />
+      )}
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
       <footer style={{ textAlign: 'center', padding: '2rem 1rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem', borderTop: '1px solid var(--border)', marginTop: '1rem' }}>
         🔒 Dette lotteriet er et internt kontorarrangement forbeholdt ansatte i Integrasjonssystmer AS.<br />
         Deltakelse er frivillig. Organisert i henhold til norsk lotteriveiledning for lukkede kretser.<br />
@@ -319,7 +308,7 @@ export default function StatisticsPage() {
   )
 }
 
-function StreakCard({ streaks, type }: { streaks: Streak[]; type: 'win' | 'lose' }) {
+function StreakCard({ streaks, type, onOpenParticipant }: { streaks: Streak[]; type: 'win' | 'lose'; onOpenParticipant: OpenParticipant }) {
   const isWin = type === 'win'
   const streak = streaks[0].streak
   return (
@@ -340,11 +329,150 @@ function StreakCard({ streaks, type }: { streaks: Streak[]; type: 'win' | 'lose'
       {streaks.map(s => (
         <div key={s.participantId} className="card-body" style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.name}</div>
+            <ParticipantLink id={s.participantId} name={s.name} onOpen={onOpenParticipant} style={{ fontWeight: 700, fontSize: '1rem' }} />
             <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{s.lotteriesParticipated} totalt deltatt</div>
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+type SelectedParticipant = { id: number; name: string }
+type OpenParticipant = (participant: SelectedParticipant) => void
+type OpenImage = (image: { src: string; alt: string }) => void
+
+function ParticipantLink({ id, name, label, onOpen, style }: { id: number; name: string; label?: string; onOpen: OpenParticipant; style?: CSSProperties }) {
+  return (
+    <button type="button" className="link-button" style={style} title={`Se gevinstene til ${name}`} onClick={() => onOpen({ id, name })}>
+      {label ?? name}
+    </button>
+  )
+}
+
+function WinnerCard({ winner, onImageClick, onOpenParticipant }: { winner: Winner; onImageClick: OpenImage; onOpenParticipant: OpenParticipant }) {
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.6rem 0.9rem', background: 'rgba(114,47,55,0.05)', borderBottom: '1px solid var(--border)' }}>
+        <span style={{ fontWeight: 800, color: 'var(--wine)', flexShrink: 0 }}>#{winner.position}</span>
+        <ParticipantLink id={winner.participantId} name={winner.participantName} label={winner.participantTag} onOpen={onOpenParticipant}
+          style={{ fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>lodd #{winner.ticketNumber}</span>
+      </div>
+      <div style={{ padding: '0.6rem 0.9rem' }}>
+        <PrizeItems items={winner.prize?.items ?? []} onImageClick={onImageClick} />
+      </div>
+    </div>
+  )
+}
+
+// Wins from before prizes were tracked point at placeholder bottles (codes UKJENT-150, UKJENT-250) that only
+// carry an estimated value for the cellar balance; that value isn't shown here, so neither is the estimate wording
+function isUnknownPrize(item: InventoryItem) {
+  return item.vinmonopoletCode.startsWith('UKJENT')
+}
+
+function PrizeItems({ items, onImageClick }: { items: InventoryItem[]; onImageClick: OpenImage }) {
+  if (items.length === 0) {
+    return <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ingen premie registrert</span>
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {items.map((item, i) => {
+        const unknown = isUnknownPrize(item)
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ width: 36, height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 4 }}>
+              {unknown ? (
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-muted)' }}>?</span>
+              ) : (
+                <img src={item.imageUrl} alt={item.name}
+                  onClick={() => onImageClick({ src: item.imageUrl, alt: item.name })}
+                  title="Klikk for å forstørre"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'zoom-in' }}
+                  onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+              )}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={item.name}>
+                {unknown ? 'Ukjent premie' : item.name}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {unknown ? 'Vunnet før premiene ble registrert' : item.category}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Built from the draw archive, which holds every closed lottery, so no extra request is needed
+function WinningsModal({ participant, lotteries, lightboxOpen, onImageClick, onClose }: {
+  participant: SelectedParticipant
+  lotteries: LotteryStatistics[]
+  lightboxOpen: boolean
+  onImageClick: OpenImage
+  onClose: () => void
+}) {
+  useEffect(() => {
+    // Escape closes an enlarged image first; the lightbox handles that keypress itself
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !lightboxOpen) onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [lightboxOpen, onClose])
+
+  const entered = lotteries.filter(l => l.participants.some(p => p.participantId === participant.id))
+  const tickets = entered.reduce((sum, l) => sum + (l.participants.find(p => p.participantId === participant.id)?.ticketsBought ?? 0), 0)
+  const won = lotteries
+    .map(l => ({ lottery: l, wins: l.winners.filter(w => w.participantId === participant.id) }))
+    .filter(l => l.wins.length > 0)
+  const winCount = won.reduce((sum, l) => sum + l.wins.length, 0)
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal" style={{ maxWidth: 560, maxHeight: 'calc(100vh - 2rem)', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div>{participant.name}</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              {winCount} {winCount === 1 ? 'gevinst' : 'gevinster'} · {tickets} lodd · {entered.length} {entered.length === 1 ? 'lotteri' : 'lotterier'}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Lukk"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', lineHeight: 1 }}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {won.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem 0' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🫠</div>
+              Ingen gevinster ennå. Neste gang, kanskje.
+            </div>
+          ) : won.map(({ lottery, wins }) => (
+            <div key={lottery.lotteryId}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, flex: 1, minWidth: 0 }}>{lottery.lotteryName}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {new Date(lottery.createdAt).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {wins.map(w => (
+                  <div key={w.position} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.6rem 0.9rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--wine)', fontSize: '0.85rem' }}>#{w.position}</span> · lodd #{w.ticketNumber}
+                    </div>
+                    <PrizeItems items={w.prize?.items ?? []} onImageClick={onImageClick} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
